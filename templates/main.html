@@ -1,0 +1,36 @@
+<!DOCTYPE HTML PUBLIC "-//SoftQuad//DTD HoTMetaL PRO 4.0::19971010::extensions to HTML 4.0//EN"
+ "hmpro4.dtd">
+
+<HTML>
+  
+  <HEAD>
+    <TITLE>{{ title }}</TITLE>
+    <LINK REL="stylesheet" TYPE="text/css" 
+    HREF="{{ url_for('static', filename='style.css') }}">
+     <META HTTP-EQUIV="refresh" CONTENT="30">
+ </HEAD>
+  
+  <BODY>
+    
+    <H1>{{ title }}</H1>
+    
+    <P>Current time is: {{ time }}</P>
+    
+    <P><A HREF="\temp">Temperatures</A></P>
+    <FORM METHOD="post" ACTION="/">
+    
+    <H3>Temperature Logging: {{ logging }}</H3>
+    <H4>{{ note }}</H4>
+
+    <BUTTON NAME="logging" VALUE="Log_Start" STYLE="width:35%" CLASS="buttong">Start
+    logging</BUTTON>
+    <BUTTON NAME="logging" VALUE="Log_Stop" STYLE="width:35%" CLASS="buttonr">Stop
+    logging</BUTTON>
+
+</FORM>
+    
+    <H3>Turn off</H3>
+    
+    <P><A HREF="\confirm">Shutdown</A></P>
+  </BODY>
+</HTML>
