@@ -1,3 +1,4 @@
+#!/usr/bin/python3 
 """Propagator Thermostat
 Reads the configuration from an associated xml file.
 Presents a set of webpages to display the temperature.
@@ -32,7 +33,7 @@ class HeaterThread ( threading.Thread ):
           global set_temperature
           
           GPIO.setmode(GPIO.BOARD)
-          print "Starting heater thread"
+          print ("Starting heater thread")
 
           for relay_pin in relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
@@ -41,8 +42,8 @@ class HeaterThread ( threading.Thread ):
           try:
                while 1: # Control the heater forever while powered
                     thermocouples = []
-                    print ""
-                    print "Measuring...    %s" % (time.ctime(time.time()))
+                    print ("")
+                    print ("Measuring...    %s" % (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
                     
@@ -68,25 +69,25 @@ class HeaterThread ( threading.Thread ):
 
                          channel = channel + 1
 
-                         print "Temperature: " + str(tc) + ".  Set Temperature: " + str(set_temperature)
+                         print ("Temperature: " + str(tc) + ".  Set Temperature: " + str(set_temperature))
 
                          if tc == "Error":
                               GPIO.output(relay_pin, GPIO.LOW) # Turn off Relay (fault condition - avoid overheating)
                               heater_state = "Error: Off"
-                              print "Error: Relay off"
+                              print ("Error: Relay off")
                          else:
                               if tc < set_temperature:
                                    GPIO.output(relay_pin, GPIO.HIGH) # Turn on relay
                                    heater_state = "On"
                                    if (log_status == "On"):
                                         log_on = log_on + 1
-                                   print "Relay on"
+                                   print ("Relay on")
                               else:
                                    GPIO.output(relay_pin, GPIO.LOW) # Turn off relay
                                    heater_state = "Off"
                                    if (log_status == "On"):
                                         log_off = log_off + 1
-                                   print "Relay off"
+                                   print ("Relay off")
             
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
@@ -240,7 +241,7 @@ def shutdown():
      import subprocess
      process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
      output = process.communicate()[0]
-     print output
+     print (output)
      templateData = {
                 'title' : title
                 }
@@ -252,7 +253,7 @@ def cancel():
      import subprocess
      process = subprocess.Popen(command.split(), stdout=subprocess.PIPE)
      output = process.communicate()[0]
-     print output
+     print (output)
 
      return index()
 
