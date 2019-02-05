@@ -28,5 +28,12 @@ See wiki.
 
 ## Changelog
 
+### V0.3
+Updated to match recommended style https://www.python.org/dev/peps/pep-0008/
+
+### V0.2
+Converted to Python3
+Made file executable
+
 ### V0.1
 Initial code copied from Propagator Thermostat project
