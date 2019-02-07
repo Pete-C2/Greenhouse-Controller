@@ -17,10 +17,10 @@ import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
 
 from max31855 import MAX31855, MAX31855Error
+import bh1750
 
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
-
 
 class HeaterThread(threading.Thread):
 
@@ -40,7 +40,9 @@ class HeaterThread(threading.Thread):
           GPIO.setmode(GPIO.BOARD)
           print("Starting heater thread")
 
-          for relay_pin in relay_pins:
+          light = bh1750.BH1750()
+
+  for relay_pin in relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
                GPIO.output(relay_pin, GPIO.LOW)
 
@@ -107,6 +109,8 @@ class HeaterThread(threading.Thread):
                                    if (log_status == "On"):
                                         log_off = log_off + 1
                                    print("Relay off")
+
+                         print("Light level: " + str(light.get_light_mode()))
 
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
@@ -283,7 +287,6 @@ def cancel():
 # Logging code: write a CSV file with header and then one set of sensor
 # measurements per interval
 
-
 class LogThread(threading.Thread):
 
      def run(self):
@@ -309,7 +312,11 @@ class LogThread(threading.Thread):
                     row.append(temps[channels]["name"])
                row.append("Heating Active (%)")
                row.append("Air Temp")
+               row.append("Light Level")
+
                logfile.writerow(row)
+
+          light = bh1750.BH1750()
 
           while log_status == "On":
                with open(filename, "at") as csvfile:
@@ -333,6 +340,8 @@ class LogThread(threading.Thread):
                     log_off = 0
 
                     row.append(air_temp)
+
+                    row.append(light.get_light_mode())
  
                     logfile.writerow(row)
                time.sleep(log_interval)
