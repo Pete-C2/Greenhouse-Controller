@@ -11,6 +11,9 @@
 </HARDWARE>
 
 <SENSORS>
+  <HUMIDITY>
+    <ADDR></ADDR>
+  </HUMIDITY>
   <CHANNEL>
     <NAME>Propagator</NAME>
     <CSPIN>12</CSPIN>

@@ -22,7 +22,6 @@ import bh1750
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
 
-
 class HeaterThread(threading.Thread):
 
      def run(self):
@@ -43,7 +42,7 @@ class HeaterThread(threading.Thread):
 
           light = bh1750.BH1750()
 
-          for relay_pin in relay_pins:
+  for relay_pin in relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
                GPIO.output(relay_pin, GPIO.LOW)
 
@@ -288,7 +287,6 @@ def cancel():
 # Logging code: write a CSV file with header and then one set of sensor
 # measurements per interval
 
-
 class LogThread(threading.Thread):
 
      def run(self):
@@ -315,6 +313,7 @@ class LogThread(threading.Thread):
                row.append("Heating Active (%)")
                row.append("Air Temp")
                row.append("Light Level")
+
                logfile.writerow(row)
 
           light = bh1750.BH1750()
