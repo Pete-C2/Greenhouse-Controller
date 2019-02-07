@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<TEMPERATURE-MONITOR>
+<GREENHOUSE-CONTROLLER>
 
 <HARDWARE>
-  <CLOCK>
+  <SPICLOCK>
     <PIN>13</PIN>
-  </CLOCK>
-  <DATA>
+  </SPICLOCK>
+  <SPIDATA>
     <PIN>11</PIN>
-  </DATA>
+  </SPIDATA>
 </HARDWARE>
 
 <SENSORS>
@@ -40,7 +40,7 @@
 </TEMPERATURES>
 
 <DISPLAY>
-  <TITLE>Propagator Thermostat</TITLE>
+  <TITLE>Greenhouse Controller</TITLE>
   <UNITS>C</UNITS>
 </DISPLAY>
 
@@ -48,4 +48,4 @@
   <INTERVAL>10</INTERVAL>
 </LOGGING>
 
-</TEMPERATURE-MONITOR>
+</GREENHOUSE-CONTROLLER>

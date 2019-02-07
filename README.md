@@ -8,6 +8,7 @@ Requires:
 - A [Raspberry Pi](http://www.raspberrypi.org/).
 - Hardware with [MAX31855 temperature monitors](https://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/MAX31855.html).
 - Hardware to control a heater element. In my case this was a propagator with a faulty control unit re-wired to drive the relay from the Raspberry Pi.
+- Hardware with [BH1750 Digital 16-bit ambient light sensor](http://www.mouser.com/ds/2/348/bh1750fvi-e-186247.pdf).
 
 Installation:
 - Copy files to a folder on the Raspberry Pi.
@@ -27,6 +28,16 @@ Recommendations (to make life easier):
 See wiki.
 
 ## Changelog
+
+### V0.4
+Added reading of light sensor
+
+### V0.3
+Updated to match recommended style https://www.python.org/dev/peps/pep-0008/
+
+### V0.2
+Converted to Python3
+Made file executable
 
 ### V0.1
 Initial code copied from Propagator Thermostat project
