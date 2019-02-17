@@ -15,12 +15,16 @@ import csv
 
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
+# ** ADD: import for one wire thermometer sensor:
+# https://github.com/timofurrer/w1thermsensor
 
 from max31855 import MAX31855, MAX31855Error
 import bh1750
+import am2320
 
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
+
 
 class HeaterThread(threading.Thread):
 
@@ -40,9 +44,10 @@ class HeaterThread(threading.Thread):
           GPIO.setmode(GPIO.BOARD)
           print("Starting heater thread")
 
-          light = bh1750.BH1750()
+          light_sensor = bh1750.BH1750()
+          airtemp_humidity_sensor = am2320.AM2320()
 
-  for relay_pin in relay_pins:
+          for relay_pin in relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
                GPIO.output(relay_pin, GPIO.LOW)
 
@@ -110,7 +115,14 @@ class HeaterThread(threading.Thread):
                                         log_off = log_off + 1
                                    print("Relay off")
 
-                         print("Light level: " + str(light.get_light_mode()))
+                         print("Light level: " +
+                               str(light_sensor.get_light_mode()))
+                         airtemp_humidity_sensor.get_data()
+                         print("Air temp: " +
+                               str(airtemp_humidity_sensor.temperature) +
+                               "\u00B0C")
+                         print("Humidity: " +
+                               str(airtemp_humidity_sensor.humidity) + "%RH")
 
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
@@ -287,6 +299,7 @@ def cancel():
 # Logging code: write a CSV file with header and then one set of sensor
 # measurements per interval
 
+
 class LogThread(threading.Thread):
 
      def run(self):
@@ -313,10 +326,12 @@ class LogThread(threading.Thread):
                row.append("Heating Active (%)")
                row.append("Air Temp")
                row.append("Light Level")
-
+               row.append("Air Temp 2")
+               row.append("Humidity")
                logfile.writerow(row)
 
-          light = bh1750.BH1750()
+          light_sensor = bh1750.BH1750()
+          airtemp_humidity_sensor = am2320.AM2320()
 
           while log_status == "On":
                with open(filename, "at") as csvfile:
@@ -341,8 +356,12 @@ class LogThread(threading.Thread):
 
                     row.append(air_temp)
 
-                    row.append(light.get_light_mode())
- 
+                    row.append(light_sensor.get_light_mode())
+
+                    airtemp_humidity_sensor.get_data()
+                    row.append(airtemp_humidity_sensor.temperature)
+                    row.append(airtemp_humidity_sensor.humidity)
+                    
                     logfile.writerow(row)
                time.sleep(log_interval)
           log_status = "Off"
