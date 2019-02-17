@@ -26,11 +26,11 @@ import am2320
 # (typically using a relay), else turn it off.
 
 
-class HeaterThread(threading.Thread):
+class PropagatorHeaterThread(threading.Thread):
 
      def run(self):
           global control_interval
-          global cs_pins
+          global propagator_cs_pins
           global spi_clock_pin
           global spi_data_pin
           global units
@@ -44,10 +44,7 @@ class HeaterThread(threading.Thread):
           GPIO.setmode(GPIO.BOARD)
           print("Starting heater thread")
 
-          light_sensor = bh1750.BH1750()
-          airtemp_humidity_sensor = am2320.AM2320()
-
-          for relay_pin in relay_pins:
+          for relay_pin in propagator_relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
                GPIO.output(relay_pin, GPIO.LOW)
 
@@ -55,7 +52,8 @@ class HeaterThread(threading.Thread):
                while 1: # Control the heater forever while powered
                     thermocouples = []
                     print("")
-                    print("Measuring...    %s" % (time.ctime(time.time())))
+                    print("Measuring temperature...    %s" %
+                          (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
 
@@ -70,15 +68,15 @@ class HeaterThread(threading.Thread):
 
                     channel = 1
 
-                    for cs_pin in cs_pins:
+                    for cs_pin in propagator_cs_pins:
                          thermocouples.append(MAX31855(cs_pin, spi_clock_pin,
                                                        spi_data_pin, units,
                                                        GPIO.BOARD))
 
                     for thermocouple, relay_pin, cal, meas in zip(thermocouples,
-                                                                  relay_pins,
-                                                                  calibrate,
-                                                                  measured):
+                                                                  propagator_relay_pins,
+                                                                  propagator_calibrate,
+                                                                  propagator_measured):
                          if (channel == 1):
                               air_temp = int(thermocouple.get_rj())
                          try:
@@ -115,17 +113,89 @@ class HeaterThread(threading.Thread):
                                         log_off = log_off + 1
                                    print("Relay off")
 
-                         print("Light level: " +
-                               str(light_sensor.get_light_mode()))
-                         airtemp_humidity_sensor.get_data()
-                         print("Air temp: " +
-                               str(airtemp_humidity_sensor.temperature) +
-                               "\u00B0C")
-                         print("Humidity: " +
-                               str(airtemp_humidity_sensor.humidity) + "%RH")
-
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
+                    time.sleep(control_interval)
+
+          except KeyboardInterrupt:
+               GPIO.cleanup()
+
+class AirHeaterThread(threading.Thread):
+
+     def run(self):
+          global control_interval
+
+          GPIO.setmode(GPIO.BOARD)
+          print("Starting air heating thread")
+
+          # Add 1 wire sensor
+
+          try:
+               while 1: # Control the air heating forever while powered
+                    print("")
+                    print("Measuring air temperature...    %s" %
+                          (time.ctime(time.time())))
+
+                    now = datetime.datetime.now().time()
+
+                    #print("Air temperature: " +
+                    #      str(light_sensor.get_light_mode()))
+
+                    time.sleep(control_interval)
+
+          except KeyboardInterrupt:
+               GPIO.cleanup()
+
+class LightingThread(threading.Thread):
+
+     def run(self):
+          global control_interval
+
+          GPIO.setmode(GPIO.BOARD)
+          print("Starting lighting thread")
+
+          light_sensor = bh1750.BH1750()
+
+          try:
+               while 1: # Control the lighting forever while powered
+                    print("")
+                    print("Measuring light...    %s" % (time.ctime(time.time())))
+
+                    now = datetime.datetime.now().time()
+
+                    print("Light level: " +
+                          str(light_sensor.get_light_mode()))
+
+                    time.sleep(control_interval)
+
+          except KeyboardInterrupt:
+               GPIO.cleanup()
+
+class HumidityThread(threading.Thread):
+
+     def run(self):
+          global control_interval
+
+          GPIO.setmode(GPIO.BOARD)
+          print("Starting humidity control thread")
+
+          airtemp_humidity_sensor = am2320.AM2320()
+
+
+          try:
+               while 1: # Control the humidity forever while powered
+                    print("")
+                    print("Measuring humidity...    %s" % (time.ctime(time.time())))
+
+                    now = datetime.datetime.now().time()
+
+                    airtemp_humidity_sensor.get_data()
+                    print("Air temp: " +
+                          str(airtemp_humidity_sensor.temperature) +
+                          "\u00B0C")
+                    print("Humidity: " +
+                          str(airtemp_humidity_sensor.humidity) + "%RH")
+
                     time.sleep(control_interval)
 
           except KeyboardInterrupt:
@@ -145,7 +215,7 @@ dir = os.path.dirname(os.path.abspath(__file__))
 tree = ET.parse(dir+"/config.xml")
 root = tree.getroot()
 hardware = root.find("HARDWARE")
-sensors = root.find("SENSORS")
+propagator_sensors = root.find("PROPAGATOR-SENSORS")
 display = root.find("DISPLAY")
 logging = root.find("LOGGING")
 schedule = root.find("TEMPERATURES")
@@ -159,29 +229,29 @@ spi_clock_pin = int(spi_clk.find("PIN").text)
 spi_data = hardware.find("SPIDATA")
 spi_data_pin = int(spi_data.find("PIN").text)
 
-# Chip Selects
-cs_pins = []
-relay_pins = []
-calibrate = []
-measured = []
-for child in sensors:
-     cs_pins.append(int(child.find("CSPIN").text))
-     relay_pins.append(int(child.find("RELAY").text))
-     calibrate.append(int(child.find("CALIBRATE").text))
-     measured.append(int(child.find("MEASURED").text))
+# Propagator monitor and control
+propagator_cs_pins = []
+propagator_relay_pins = []
+propagator_calibrate = []
+propagator_measured = []
+for child in propagator_sensors:
+     propagator_cs_pins.append(int(child.find("CSPIN").text))
+     propagator_relay_pins.append(int(child.find("RELAY").text))
+     propagator_calibrate.append(int(child.find("CALIBRATE").text))
+     propagator_measured.append(int(child.find("MEASURED").text))
 
 # Read display settings configuration
 units = display.find("UNITS").text.lower()
 title = display.find("TITLE").text
 
 channel_names = []
-for child in sensors:
+for child in propagator_sensors:
      channel_names.append(child.find("NAME").text)
 
 # Create a dictionary called temps to store the temperatures and names:
 temps = {}
 channel = 1
-for child in sensors:
+for child in propagator_sensors:
      temps[channel] = {"name": child.find("NAME").text, "temp": ""}
      channel = channel + 1
 
@@ -209,7 +279,9 @@ control_interval = 10 # seconds. Interval between control measurements
 
 set_temperature = 0 # Default value pending reading of correct value
 
-HeaterThread().start()
+PropagatorHeaterThread().start()
+LightingThread().start()
+HumidityThread().start()
 
 # Flask web page code
 
@@ -306,7 +378,7 @@ class LogThread(threading.Thread):
           global log_status
           global dir
           global log_interval
-          global cs_pins
+          global propagator_cs_pins
           global spi_clock_pin
           global spi_data_pin
           global units

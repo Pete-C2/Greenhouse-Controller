@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.6
+Split control elements into separate threads
+
 ### V0.5
 Added reading of humidity/temperature sensor
 
