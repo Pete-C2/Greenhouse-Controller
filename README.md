@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.7
+Moved print output into debug function so that when complete the application runs with a cleaner interface, with optional debug output
+
 ### V0.6
 Split control elements into separate threads
 

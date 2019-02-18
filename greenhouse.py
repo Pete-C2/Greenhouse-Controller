@@ -12,6 +12,7 @@ import os
 import threading
 import time
 import csv
+import sys
 
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
@@ -21,6 +22,13 @@ from flask import Flask, render_template, request
 from max31855 import MAX31855, MAX31855Error
 import bh1750
 import am2320
+
+# Debug logging
+
+def debug_log(log_string):
+     global debug_logging
+     if (debug_logging == "Enabled"):
+         print(log_string)
 
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
@@ -40,9 +48,10 @@ class PropagatorHeaterThread(threading.Thread):
           global log_on
           global log_off
           global set_temperature
+          global logging
 
           GPIO.setmode(GPIO.BOARD)
-          print("Starting heater thread")
+          debug_log("Starting heater thread")
 
           for relay_pin in propagator_relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
@@ -51,8 +60,8 @@ class PropagatorHeaterThread(threading.Thread):
           try:
                while 1: # Control the heater forever while powered
                     thermocouples = []
-                    print("")
-                    print("Measuring temperature...    %s" %
+                    debug_log("")
+                    debug_log("Measuring temperature...    %s" %
                           (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
@@ -74,9 +83,9 @@ class PropagatorHeaterThread(threading.Thread):
                                                        GPIO.BOARD))
 
                     for thermocouple, relay_pin, cal, meas in zip(thermocouples,
-                                                                  propagator_relay_pins,
-                                                                  propagator_calibrate,
-                                                                  propagator_measured):
+                                                        propagator_relay_pins,
+                                                        propagator_calibrate,
+                                                        propagator_measured):
                          if (channel == 1):
                               air_temp = int(thermocouple.get_rj())
                          try:
@@ -88,7 +97,7 @@ class PropagatorHeaterThread(threading.Thread):
 
                          channel = channel + 1
 
-                         print("Temperature: " + str(tc) +
+                         debug_log("Temperature: " + str(tc) +
                                 ".  Set Temperature: " + str(set_temperature))
 
                          if tc == "Error":
@@ -96,7 +105,7 @@ class PropagatorHeaterThread(threading.Thread):
                               # Turn off Relay (fault condition -
                               # avoid overheating)
                               heater_state = "Error: Off"
-                              print("Error: Relay off")
+                              debug_log("Error: Relay off")
                          else:
                               if tc < set_temperature:
                                    GPIO.output(relay_pin, GPIO.HIGH)
@@ -104,14 +113,14 @@ class PropagatorHeaterThread(threading.Thread):
                                    heater_state = "On"
                                    if (log_status == "On"):
                                         log_on = log_on + 1
-                                   print("Relay on")
+                                   debug_log("Relay on")
                               else:
                                    GPIO.output(relay_pin, GPIO.LOW)
                                    # Turn off relay
                                    heater_state = "Off"
                                    if (log_status == "On"):
                                         log_off = log_off + 1
-                                   print("Relay off")
+                                   debug_log("Relay off")
 
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
@@ -126,19 +135,19 @@ class AirHeaterThread(threading.Thread):
           global control_interval
 
           GPIO.setmode(GPIO.BOARD)
-          print("Starting air heating thread")
+          debug_log("Starting air heating thread")
 
           # Add 1 wire sensor
 
           try:
                while 1: # Control the air heating forever while powered
-                    print("")
-                    print("Measuring air temperature...    %s" %
+                    debug_log("")
+                    debug_log("Measuring air temperature...    %s" %
                           (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
 
-                    #print("Air temperature: " +
+                    #debug_log("Air temperature: " +
                     #      str(light_sensor.get_light_mode()))
 
                     time.sleep(control_interval)
@@ -152,18 +161,19 @@ class LightingThread(threading.Thread):
           global control_interval
 
           GPIO.setmode(GPIO.BOARD)
-          print("Starting lighting thread")
+          debug_log("Starting lighting thread")
 
           light_sensor = bh1750.BH1750()
 
           try:
                while 1: # Control the lighting forever while powered
-                    print("")
-                    print("Measuring light...    %s" % (time.ctime(time.time())))
+                    debug_log("")
+                    debug_log("Measuring light...    %s" %
+                          (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
 
-                    print("Light level: " +
+                    debug_log("Light level: " +
                           str(light_sensor.get_light_mode()))
 
                     time.sleep(control_interval)
@@ -177,23 +187,24 @@ class HumidityThread(threading.Thread):
           global control_interval
 
           GPIO.setmode(GPIO.BOARD)
-          print("Starting humidity control thread")
+          debug_log("Starting humidity control thread")
 
           airtemp_humidity_sensor = am2320.AM2320()
 
 
           try:
                while 1: # Control the humidity forever while powered
-                    print("")
-                    print("Measuring humidity...    %s" % (time.ctime(time.time())))
+                    debug_log("")
+                    debug_log("Measuring humidity...    %s" %
+                          (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
 
                     airtemp_humidity_sensor.get_data()
-                    print("Air temp: " +
+                    debug_log("Air temp: " +
                           str(airtemp_humidity_sensor.temperature) +
                           "\u00B0C")
-                    print("Humidity: " +
+                    debug_log("Humidity: " +
                           str(airtemp_humidity_sensor.humidity) + "%RH")
 
                     time.sleep(control_interval)
@@ -206,6 +217,15 @@ app = Flask(__name__)
 # Initialisation
 
 heater_state = "Off"
+debug_logging = "Off"
+
+# Read any command line parameters
+
+total = len(sys.argv)
+cmdargs = str(sys.argv)
+for i in range(total):
+     if (str(sys.argv[i]) == "--debug"):
+          debug_logging = "Enabled"
 
 # Read config from xml file
 
