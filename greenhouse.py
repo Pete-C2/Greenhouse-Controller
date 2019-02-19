@@ -163,10 +163,16 @@ class LightingThread(threading.Thread):
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting lighting thread")
 
+          for relay_pin in lighting_relay_pins:
+               GPIO.setup(relay_pin, GPIO.OUT)
+               GPIO.output(relay_pin, GPIO.LOW)
+
           light_sensor = bh1750.BH1750()
 
           try:
                while 1: # Control the lighting forever while powered
+                    current_lux = light_sensor.get_light_mode()
+
                     debug_log("")
                     debug_log("Measuring light...    %s" %
                           (time.ctime(time.time())))
@@ -174,7 +180,25 @@ class LightingThread(threading.Thread):
                     now = datetime.datetime.now().time()
 
                     debug_log("Light level: " +
-                          str(light_sensor.get_light_mode()))
+                          str(current_lux))
+
+                    for relay_pin, on_lux, hysteresis, status in zip(
+                                                        lighting_relay_pins,
+                                                        lighting_on_lux,
+                                                        lighting_hysteresis,
+                                                        lighting_status):
+                         if (current_lux < on_lux):
+                              status = "On"
+                              # Turn on relay
+                              GPIO.output(relay_pin, GPIO.HIGH)
+                              debug_log("Relay on")
+                         elif (current_lux > (on_lux + hysteresis)):
+                              status = "Off"
+                              # Turn off relay
+                              GPIO.output(relay_pin, GPIO.LOW)
+                              debug_log("Relay off")
+                         else:
+                              debug_log("Light level within state change hysteresis")
 
                     time.sleep(control_interval)
 
@@ -231,11 +255,13 @@ for i in range(total):
 
 # Find directory of the program
 dir = os.path.dirname(os.path.abspath(__file__))
+debug_log("Configuration: " + dir+"/config.xml")
 # Get the configuration
 tree = ET.parse(dir+"/config.xml")
 root = tree.getroot()
 hardware = root.find("HARDWARE")
 propagator_sensors = root.find("PROPAGATOR-SENSORS")
+lighting_sensors = root.find("LIGHTING-SENSORS")
 display = root.find("DISPLAY")
 logging = root.find("LOGGING")
 schedule = root.find("TEMPERATURES")
@@ -254,19 +280,30 @@ propagator_cs_pins = []
 propagator_relay_pins = []
 propagator_calibrate = []
 propagator_measured = []
+propagator_channel_names = []
 for child in propagator_sensors:
      propagator_cs_pins.append(int(child.find("CSPIN").text))
      propagator_relay_pins.append(int(child.find("RELAY").text))
      propagator_calibrate.append(int(child.find("CALIBRATE").text))
      propagator_measured.append(int(child.find("MEASURED").text))
+     propagator_channel_names.append(child.find("NAME").text)
+
+# Lighting monitor and control
+lighting_relay_pins = []
+lighting_on_lux = []
+lighting_hysteresis = []
+lighting_channel_names = []
+lighting_status = []
+for child in lighting_sensors:
+     lighting_relay_pins.append(int(child.find("RELAY").text))
+     lighting_on_lux.append(int(child.find("ON-LUX").text))
+     lighting_hysteresis.append(int(child.find("HYSTERESIS").text))
+     lighting_channel_names.append(child.find("NAME").text)
+     lighting_status.append("Off")
 
 # Read display settings configuration
 units = display.find("UNITS").text.lower()
 title = display.find("TITLE").text
-
-channel_names = []
-for child in propagator_sensors:
-     channel_names.append(child.find("NAME").text)
 
 # Create a dictionary called temps to store the temperatures and names:
 temps = {}

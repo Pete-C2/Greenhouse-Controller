@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.8
+Added basic control of lighting relay with a fixed lux level
+
 ### V0.7
 Moved print output into debug function so that when complete the application runs with a cleaner interface, with optional debug output
 
