@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.12
+Added timed control of lighting
+
 ### V0.11
 Completed display of defined configuration
 

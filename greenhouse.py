@@ -258,6 +258,14 @@ class LightingThread(threading.Thread):
 
                     now = datetime.datetime.now().time()
 
+                    set_status = lighting_schedule[1]["status"]
+                    # Default to the first timed status
+                    for count in lighting_schedule:
+                          if (now >= lighting_schedule[count]["time"]):
+                              set_status = lighting_schedule[count]["status"]
+                              # Keep selecting a new status if the time is
+                              # later than the start of the time schedule
+
                     debug_log("Light level: " +
                           str(current_lux) + " lux")
 
@@ -266,18 +274,23 @@ class LightingThread(threading.Thread):
                                                         lighting_on_lux,
                                                         lighting_hysteresis,
                                                         lighting_status):
-                         if (current_lux < on_lux):
-                              status = "On"
-                              # Turn on relay
-                              GPIO.output(relay_pin, GPIO.HIGH)
-                              debug_log("Relay on")
-                         elif (current_lux > (on_lux + hysteresis)):
-                              status = "Off"
-                              # Turn off relay
-                              GPIO.output(relay_pin, GPIO.LOW)
-                              debug_log("Relay off")
+                         if (set_status == "On"):
+                              if (current_lux < on_lux):
+                                   status = "On"
+                                   # Turn on relay
+                                   GPIO.output(relay_pin, GPIO.HIGH)
+                                   debug_log("Light relay on")
+                              elif (current_lux > (on_lux + hysteresis)):
+                                   status = "Off"
+                                   # Turn off relay
+                                   GPIO.output(relay_pin, GPIO.LOW)
+                                   debug_log("Light relay off")
+                              else:
+                                   debug_log("Light level within state change hysteresis")
                          else:
-                              debug_log("Light level within state change hysteresis")
+                              # set_status should be Off (but not checked)
+                              GPIO.output(relay_pin, GPIO.LOW)
+                              debug_log("Light relay off by time schedule")
 
                     time.sleep(control_interval)
 
@@ -402,7 +415,7 @@ for child in propagator_sensors:
      temps[channel] = {"name": child.find("NAME").text, "temp": ""}
      channel = channel + 1
 
-# Read temperature/time schedules
+# Read temperature/lux time schedules
 temperature_schedule = {}
 count = 1
 for child in temps_schedule:
