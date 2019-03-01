@@ -46,7 +46,17 @@ def print_config():
           print("      > Relay = " + str(relay_pin)) 
           print("      > Calibration = " + str(cal) + "\u00B0C at " + str(meas)
           + "\u00B0C")
-#     print(temperature_schedule)
+     for count in temperature_schedule:
+          print("    From " + str(temperature_schedule[count]["time"]) +
+                ": " + str(temperature_schedule[count]["temp"]) + "\u00B0C")
+
+     print("  Air heating:")
+     print("    > Relay = " + str(air_heating_relay_pin))
+     print("    > Calibration = " + str(air_calibrate) + "\u00B0C at " +
+           str(air_measured) + "\u00B0C")
+     for count in air_temperature_schedule:
+          print("    From " + str(air_temperature_schedule[count]["time"]) +
+                ": " + str(air_temperature_schedule[count]["temp"]) + "\u00B0C")
 
      print("  Lighting:")
      for relay_pin, on_lux, hysteresis, name in zip(
@@ -58,6 +68,12 @@ def print_config():
           print("      > Relay = " + str(relay_pin)) 
           print("      > On Lux = " + str(on_lux))
           print("      > Hysteresis = " + str (hysteresis))
+     for count in lighting_schedule:
+          print("    From " + str(lighting_schedule[count]["time"]) +
+                ": " + str(lighting_schedule[count]["status"]))
+
+     print("  Units = " + units)
+     print("  Title = " + title)
 
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
@@ -412,7 +428,7 @@ for child in light_schedule:
      temp = datetime.datetime.strptime(child.find("TIME").text, "%H:%M")
      schedule_time = temp.time()
      lighting_schedule[count] = {"time": schedule_time,
-                                 "lux": int(child.find("ON-LUX").text)
+                                 "status": child.find("STATUS").text
                                 }
      count = count + 1
 

@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.11
+Completed display of defined configuration
+
 ### V0.10
 Added one-wire temperature sensor and control of air heater
 
