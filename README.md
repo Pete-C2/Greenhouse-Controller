@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.13
+Added individual enable/disable for each control
+
 ### V0.12
 Added timed control of lighting
 

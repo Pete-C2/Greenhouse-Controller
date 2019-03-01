@@ -34,18 +34,20 @@ def debug_log(log_string):
 def print_config():
      print("Configuration:")
      print("  Temperature thermocouples:")
-     for cs_pin, relay_pin, cal, meas, name in zip(
+     for cs_pin, relay_pin, cal, meas, name, status in zip(
                                     propagator_cs_pins,
                                     propagator_relay_pins,
                                     propagator_calibrate,
                                     propagator_measured,
-                                    propagator_channel_names):
+                                    propagator_channel_names,
+                                    propagator_enabled):
 
           print("    Propagator: " + name)
           print("      > Chip Select = " + str(cs_pin))
           print("      > Relay = " + str(relay_pin)) 
           print("      > Calibration = " + str(cal) + "\u00B0C at " + str(meas)
           + "\u00B0C")
+          print("      > Status = " + status)
      for count in temperature_schedule:
           print("    From " + str(temperature_schedule[count]["time"]) +
                 ": " + str(temperature_schedule[count]["temp"]) + "\u00B0C")
@@ -54,20 +56,24 @@ def print_config():
      print("    > Relay = " + str(air_heating_relay_pin))
      print("    > Calibration = " + str(air_calibrate) + "\u00B0C at " +
            str(air_measured) + "\u00B0C")
+     print("      > Status = " + air_enabled)
+
      for count in air_temperature_schedule:
           print("    From " + str(air_temperature_schedule[count]["time"]) +
                 ": " + str(air_temperature_schedule[count]["temp"]) + "\u00B0C")
 
      print("  Lighting:")
-     for relay_pin, on_lux, hysteresis, name in zip(
+     for relay_pin, on_lux, hysteresis, name, status in zip(
                                                         lighting_relay_pins,
                                                         lighting_on_lux,
                                                         lighting_hysteresis,
-                                                        lighting_channel_names):
+                                                        lighting_channel_names,
+                                                        lighting_enabled):
           print("    Light: " + name)
           print("      > Relay = " + str(relay_pin)) 
           print("      > On Lux = " + str(on_lux))
           print("      > Hysteresis = " + str (hysteresis))
+          print("      > Status = " + status)
      for count in lighting_schedule:
           print("    From " + str(lighting_schedule[count]["time"]) +
                 ": " + str(lighting_schedule[count]["status"]))
@@ -96,7 +102,7 @@ class PropagatorHeaterThread(threading.Thread):
           global logging
 
           GPIO.setmode(GPIO.BOARD)
-          debug_log("Starting heater thread")
+          debug_log("Starting propagator heater thread")
 
           for relay_pin in propagator_relay_pins:
                GPIO.setup(relay_pin, GPIO.OUT)
@@ -106,7 +112,7 @@ class PropagatorHeaterThread(threading.Thread):
                while 1: # Control the heater forever while powered
                     thermocouples = []
                     debug_log("")
-                    debug_log("Measuring temperature...    %s" %
+                    debug_log("Measuring propagator temperature...    %s" %
                           (time.ctime(time.time())))
 
                     now = datetime.datetime.now().time()
@@ -127,46 +133,59 @@ class PropagatorHeaterThread(threading.Thread):
                                                        spi_data_pin, units,
                                                        GPIO.BOARD))
 
-                    for thermocouple, relay_pin, cal, meas in zip(thermocouples,
+                    for thermocouple, relay_pin, cal, meas, enabled in zip(
+                                                        thermocouples,
                                                         propagator_relay_pins,
                                                         propagator_calibrate,
-                                                        propagator_measured):
-                         if (channel == 1):
-                              air_temp = int(thermocouple.get_rj())
-                         try:
-                              tc = int(thermocouple.get()) + cal - meas
-                              temps[channel]["temp"] = tc
-                         except MAX31855Error as e:
-                              tc = "Error"
-                              temps[channel]["temp"] = "Error: " + e.value
+                                                        propagator_measured,
+                                                        propagator_enabled):
+                         if (enabled == "Enabled"):
+                              if (channel == 1):
+                                   air_temp = int(thermocouple.get_rj())
+                              try:
+                                   tc = int(thermocouple.get()) + cal - meas
+                                   temps[channel]["temp"] = tc
+                              except MAX31855Error as e:
+                                   tc = "Error"
+                                   temps[channel]["temp"] = "Error: " + e.value
 
-                         channel = channel + 1
+                              channel = channel + 1
 
-                         debug_log("Temperature: " + str(tc) + "\u00B0C"+
-                                ".  Set Temperature: " + str(set_temperature)
-                                   + "\u00B0C")
+                              debug_log("Temperature: " + str(tc) + "\u00B0C"
+                                        + ".  Set Temperature: "
+                                        + str(set_temperature)
+                                        + "\u00B0C")
 
-                         if tc == "Error":
-                              GPIO.output(relay_pin, GPIO.LOW)
-                              # Turn off Relay (fault condition -
-                              # avoid overheating)
-                              heater_state = "Error: Off"
-                              debug_log("Error: Relay off")
-                         else:
-                              if tc < set_temperature:
-                                   GPIO.output(relay_pin, GPIO.HIGH)
-                                   # Turn on relay
-                                   heater_state = "On"
-                                   if (log_status == "On"):
-                                        log_on = log_on + 1
-                                   debug_log("Relay on")
-                              else:
+                              if tc == "Error":
                                    GPIO.output(relay_pin, GPIO.LOW)
-                                   # Turn off relay
-                                   heater_state = "Off"
-                                   if (log_status == "On"):
-                                        log_off = log_off + 1
-                                   debug_log("Relay off")
+                                   # Turn off Relay (fault condition -
+                                   # avoid overheating)
+                                   heater_state = "Error: Off"
+                                   debug_log("Error: Propagator relay off")
+                              else:
+                                   if tc < set_temperature:
+                                        GPIO.output(relay_pin, GPIO.HIGH)
+                                        # Turn on relay
+                                        heater_state = "On"
+                                        if (log_status == "On"):
+                                             log_on = log_on + 1
+                                        debug_log("Propagator relay on")
+                                   else:
+                                        GPIO.output(relay_pin, GPIO.LOW)
+                                        # Turn off relay
+                                        heater_state = "Off"
+                                        if (log_status == "On"):
+                                             log_off = log_off + 1
+                                        debug_log("Propagator relay off")
+                         else:
+                              # Propagator is disabled
+                              GPIO.output(relay_pin, GPIO.LOW)
+                              # Turn off relay
+                              heater_state = "Off"
+                              if (log_status == "On"):
+                                   log_off = log_off + 1
+                              debug_log("Propagator disabled - Relay off")
+                              
 
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
@@ -208,26 +227,36 @@ class AirHeaterThread(threading.Thread):
                               # Keep selecting a new temperature if the time is
                               # later than the start of the time schedule
 
-                    air_temperature = sensor.get_temperature() \
-                                        + air_calibrate - air_measured
+                    if (air_enabled == "Enabled"):
+                         air_temperature = sensor.get_temperature() \
+                                             + air_calibrate - air_measured
 
-                    debug_log("Air temperature: " +
-                              "{0:+.1f}".format(air_temperature) + "\u00B0C")
-                    if air_temperature < set_temperature:
-                         # Turn air heater relay on
-                         GPIO.output(air_heating_relay_pin, GPIO.HIGH)
-                         # Turn on relay
-                         air_heater_state = "On"
-                         if (log_status == "On"):
-                              air_log_on = air_log_on + 1
-                         debug_log("Air heating relay on")
+                         debug_log("Air temperature: " +
+                                   "{0:+.1f}".format(air_temperature) +
+                                   "\u00B0C")
+                         if air_temperature < set_temperature:
+                              # Turn air heater relay on
+                              GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+                              # Turn on relay
+                              air_heater_state = "On"
+                              if (log_status == "On"):
+                                   air_log_on = air_log_on + 1
+                              debug_log("Air heating relay on")
+                         else:
+                              GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                              # Turn off relay
+                              air_heater_state = "Off"
+                              if (log_status == "On"):
+                                   air_log_off = air_log_off + 1
+                              debug_log("Air heating relay off")
                     else:
+                         # Air heating disabled
                          GPIO.output(air_heating_relay_pin, GPIO.LOW)
                          # Turn off relay
                          air_heater_state = "Off"
                          if (log_status == "On"):
                               air_log_off = air_log_off + 1
-                         debug_log("Air heating relay off")
+                         debug_log("Air heating disabled - relay off")
 
                     time.sleep(control_interval)
 
@@ -269,28 +298,34 @@ class LightingThread(threading.Thread):
                     debug_log("Light level: " +
                           str(current_lux) + " lux")
 
-                    for relay_pin, on_lux, hysteresis, status in zip(
+                    for relay_pin, on_lux, hysteresis, status, enabled in zip(
                                                         lighting_relay_pins,
                                                         lighting_on_lux,
                                                         lighting_hysteresis,
-                                                        lighting_status):
-                         if (set_status == "On"):
-                              if (current_lux < on_lux):
-                                   status = "On"
-                                   # Turn on relay
-                                   GPIO.output(relay_pin, GPIO.HIGH)
-                                   debug_log("Light relay on")
-                              elif (current_lux > (on_lux + hysteresis)):
-                                   status = "Off"
-                                   # Turn off relay
-                                   GPIO.output(relay_pin, GPIO.LOW)
-                                   debug_log("Light relay off")
+                                                        lighting_status,
+                                                        lighting_enabled):
+                         if (enabled == "Enabled"):
+                              if (set_status == "On"):
+                                   if (current_lux < on_lux):
+                                        status = "On"
+                                        # Turn on relay
+                                        GPIO.output(relay_pin, GPIO.HIGH)
+                                        debug_log("Light relay on")
+                                   elif (current_lux > (on_lux + hysteresis)):
+                                        status = "Off"
+                                        # Turn off relay
+                                        GPIO.output(relay_pin, GPIO.LOW)
+                                        debug_log("Light relay off")
+                                   else:
+                                        debug_log("Light level within state change hysteresis")
                               else:
-                                   debug_log("Light level within state change hysteresis")
+                                   # set_status should be Off (but not checked)
+                                   GPIO.output(relay_pin, GPIO.LOW)
+                                   debug_log("Light relay off by time schedule")
                          else:
-                              # set_status should be Off (but not checked)
+                              # Lighting is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
-                              debug_log("Light relay off by time schedule")
+                              debug_log("Light disabled - relay off")
 
                     time.sleep(control_interval)
 
@@ -379,29 +414,34 @@ propagator_relay_pins = []
 propagator_calibrate = []
 propagator_measured = []
 propagator_channel_names = []
+propagator_enabled = []
 for child in propagator_sensors:
      propagator_cs_pins.append(int(child.find("CSPIN").text))
      propagator_relay_pins.append(int(child.find("RELAY").text))
      propagator_calibrate.append(int(child.find("CALIBRATE").text))
      propagator_measured.append(int(child.find("MEASURED").text))
      propagator_channel_names.append(child.find("NAME").text)
+     propagator_enabled.append(child.find("ENABLED").text)
 
 for child in air_sensors:
      air_heating_relay_pin = (int(child.find("RELAY").text))
      air_calibrate = (int(child.find("CALIBRATE").text))
      air_measured = (int(child.find("MEASURED").text))
+     air_enabled = (child.find("ENABLED").text)
 
 # Lighting monitor and control
 lighting_relay_pins = []
 lighting_on_lux = []
 lighting_hysteresis = []
 lighting_channel_names = []
+lighting_enabled = []
 lighting_status = []
 for child in lighting_sensors:
      lighting_relay_pins.append(int(child.find("RELAY").text))
      lighting_on_lux.append(int(child.find("ON-LUX").text))
      lighting_hysteresis.append(int(child.find("HYSTERESIS").text))
      lighting_channel_names.append(child.find("NAME").text)
+     lighting_enabled.append(child.find("ENABLED").text)
      lighting_status.append("Off")
 
 # Read display settings configuration
