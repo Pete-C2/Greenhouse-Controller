@@ -16,8 +16,7 @@ import sys
 
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
-# ** ADD: import for one wire thermometer sensor:
-# https://github.com/timofurrer/w1thermsensor
+from w1thermsensor import W1ThermSensor
 
 from max31855 import MAX31855, MAX31855Error
 import bh1750
@@ -29,6 +28,36 @@ def debug_log(log_string):
      global debug_logging
      if (debug_logging == "Enabled"):
          print(log_string)
+
+# Display config
+
+def print_config():
+     print("Configuration:")
+     print("  Temperature thermocouples:")
+     for cs_pin, relay_pin, cal, meas, name in zip(
+                                    propagator_cs_pins,
+                                    propagator_relay_pins,
+                                    propagator_calibrate,
+                                    propagator_measured,
+                                    propagator_channel_names):
+
+          print("    Propagator: " + name)
+          print("      > Chip Select = " + str(cs_pin))
+          print("      > Relay = " + str(relay_pin)) 
+          print("      > Calibration = " + str(cal) + "\u00B0C at " + str(meas)
+          + "\u00B0C")
+#     print(temperature_schedule)
+
+     print("  Lighting:")
+     for relay_pin, on_lux, hysteresis, name in zip(
+                                                        lighting_relay_pins,
+                                                        lighting_on_lux,
+                                                        lighting_hysteresis,
+                                                        lighting_channel_names):
+          print("    Light: " + name)
+          print("      > Relay = " + str(relay_pin)) 
+          print("      > On Lux = " + str(on_lux))
+          print("      > Hysteresis = " + str (hysteresis))
 
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
@@ -97,8 +126,9 @@ class PropagatorHeaterThread(threading.Thread):
 
                          channel = channel + 1
 
-                         debug_log("Temperature: " + str(tc) +
-                                ".  Set Temperature: " + str(set_temperature))
+                         debug_log("Temperature: " + str(tc) + "\u00B0C"+
+                                ".  Set Temperature: " + str(set_temperature)
+                                   + "\u00B0C")
 
                          if tc == "Error":
                               GPIO.output(relay_pin, GPIO.LOW)
@@ -133,12 +163,18 @@ class AirHeaterThread(threading.Thread):
 
      def run(self):
           global control_interval
+          global air_heater_state
+          global air_log_on
+          global air_log_off
 
-          GPIO.setmode(GPIO.BOARD)
           debug_log("Starting air heating thread")
 
-          # Add 1 wire sensor
-
+          sensor = W1ThermSensor() # Assumes just one sensor available
+          
+          GPIO.setmode(GPIO.BOARD)
+          GPIO.setup(air_heating_relay_pin, GPIO.OUT)
+          GPIO.output(air_heating_relay_pin, GPIO.LOW)
+          
           try:
                while 1: # Control the air heating forever while powered
                     debug_log("")
@@ -147,8 +183,35 @@ class AirHeaterThread(threading.Thread):
 
                     now = datetime.datetime.now().time()
 
-                    #debug_log("Air temperature: " +
-                    #      str(light_sensor.get_light_mode()))
+                    set_temperature = air_temperature_schedule[1]["temp"]
+                    # Default to the first timed temperature
+                    for count in air_temperature_schedule:
+                          if (now >= air_temperature_schedule[count]["time"]):
+                              set_temperature = air_temperature_schedule \
+                                                [count]["temp"]
+                              # Keep selecting a new temperature if the time is
+                              # later than the start of the time schedule
+
+                    air_temperature = sensor.get_temperature() \
+                                        + air_calibrate - air_measured
+
+                    debug_log("Air temperature: " +
+                              "{0:+.1f}".format(air_temperature) + "\u00B0C")
+                    if air_temperature < set_temperature:
+                         # Turn air heater relay on
+                         GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+                         # Turn on relay
+                         air_heater_state = "On"
+                         if (log_status == "On"):
+                              air_log_on = air_log_on + 1
+                         debug_log("Air heating relay on")
+                    else:
+                         GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                         # Turn off relay
+                         air_heater_state = "Off"
+                         if (log_status == "On"):
+                              air_log_off = air_log_off + 1
+                         debug_log("Air heating relay off")
 
                     time.sleep(control_interval)
 
@@ -180,7 +243,7 @@ class LightingThread(threading.Thread):
                     now = datetime.datetime.now().time()
 
                     debug_log("Light level: " +
-                          str(current_lux))
+                          str(current_lux) + " lux")
 
                     for relay_pin, on_lux, hysteresis, status in zip(
                                                         lighting_relay_pins,
@@ -242,6 +305,7 @@ app = Flask(__name__)
 
 heater_state = "Off"
 debug_logging = "Off"
+display_config = "Off"
 
 # Read any command line parameters
 
@@ -250,6 +314,8 @@ cmdargs = str(sys.argv)
 for i in range(total):
      if (str(sys.argv[i]) == "--debug"):
           debug_logging = "Enabled"
+     if (str(sys.argv[i]) == "--display-config"):
+          display_config = "Enabled"
 
 # Read config from xml file
 
@@ -262,9 +328,12 @@ root = tree.getroot()
 hardware = root.find("HARDWARE")
 propagator_sensors = root.find("PROPAGATOR-SENSORS")
 lighting_sensors = root.find("LIGHTING-SENSORS")
+air_sensors = root.find("AIR-SENSORS")
 display = root.find("DISPLAY")
 logging = root.find("LOGGING")
-schedule = root.find("TEMPERATURES")
+temps_schedule = root.find("TEMPERATURES")
+air_temps_schedule = root.find("AIR-TEMPERATURES")
+light_schedule = root.find("LIGHTING")
 
 # Read hardware configuration
 # Clock
@@ -287,6 +356,11 @@ for child in propagator_sensors:
      propagator_calibrate.append(int(child.find("CALIBRATE").text))
      propagator_measured.append(int(child.find("MEASURED").text))
      propagator_channel_names.append(child.find("NAME").text)
+
+for child in air_sensors:
+     air_heating_relay_pin = (int(child.find("RELAY").text))
+     air_calibrate = (int(child.find("CALIBRATE").text))
+     air_measured = (int(child.find("MEASURED").text))
 
 # Lighting monitor and control
 lighting_relay_pins = []
@@ -315,12 +389,31 @@ for child in propagator_sensors:
 # Read temperature/time schedules
 temperature_schedule = {}
 count = 1
-for child in schedule:
+for child in temps_schedule:
      temp = datetime.datetime.strptime(child.find("TIME").text, "%H:%M")
      schedule_time = temp.time()
      temperature_schedule[count] = {"time": schedule_time,
                                     "temp": int(child.find("TEMPERATURE").text)
                                     }
+     count = count + 1
+
+air_temperature_schedule = {}
+count = 1
+for child in air_temps_schedule:
+     temp = datetime.datetime.strptime(child.find("TIME").text, "%H:%M")
+     schedule_time = temp.time()
+     air_temperature_schedule[count] = {"time": schedule_time,
+                                    "temp": int(child.find("TEMPERATURE").text)
+                                    }
+     count = count + 1
+lighting_schedule = {}
+count = 1
+for child in light_schedule:
+     temp = datetime.datetime.strptime(child.find("TIME").text, "%H:%M")
+     schedule_time = temp.time()
+     lighting_schedule[count] = {"time": schedule_time,
+                                 "lux": int(child.find("ON-LUX").text)
+                                }
      count = count + 1
 
 # Read logging
@@ -336,7 +429,11 @@ control_interval = 10 # seconds. Interval between control measurements
 
 set_temperature = 0 # Default value pending reading of correct value
 
+if (display_config == "Enabled"):
+     print_config()
+
 PropagatorHeaterThread().start()
+AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
 
@@ -457,10 +554,12 @@ class LogThread(threading.Thread):
                row.append("Light Level")
                row.append("Air Temp 2")
                row.append("Humidity")
+               row.append("Air Temp 3")
                logfile.writerow(row)
 
           light_sensor = bh1750.BH1750()
           airtemp_humidity_sensor = am2320.AM2320()
+          onewire_sensor = W1ThermSensor()
 
           while log_status == "On":
                with open(filename, "at") as csvfile:
@@ -490,6 +589,7 @@ class LogThread(threading.Thread):
                     airtemp_humidity_sensor.get_data()
                     row.append(airtemp_humidity_sensor.temperature)
                     row.append(airtemp_humidity_sensor.humidity)
+                    row.append(onewire_sensor.get_temperature())
                     
                     logfile.writerow(row)
                time.sleep(log_interval)

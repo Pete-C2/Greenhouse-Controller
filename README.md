@@ -32,6 +32,12 @@ See wiki.
 
 ## Changelog
 
+### V0.10
+Added one-wire temperature sensor and control of air heater
+
+### V0.9
+Added option to display the defined configuration
+
 ### V0.8
 Added basic control of lighting relay with a fixed lux level
 
