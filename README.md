@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.14
+Added detection of fault in reading light sensor. Default to turn lighting on for the timed duration.
+
 ### V0.13
 Added individual enable/disable for each control
 

@@ -279,11 +279,18 @@ class LightingThread(threading.Thread):
 
           try:
                while 1: # Control the lighting forever while powered
-                    current_lux = light_sensor.get_light_mode()
-
                     debug_log("")
                     debug_log("Measuring light...    %s" %
                           (time.ctime(time.time())))
+
+                    try:
+                         current_lux = light_sensor.get_light_mode()
+                    except:
+                         debug_log("Light sensor error")
+                         current_lux = 0 # Define illumination as pitch black.
+                         # If the light sensor fails then the lights will be
+                         # turned on for the defined timer duration irrespective
+                         # of actual illumination.
 
                     now = datetime.datetime.now().time()
 
@@ -296,7 +303,7 @@ class LightingThread(threading.Thread):
                               # later than the start of the time schedule
 
                     debug_log("Light level: " +
-                          str(current_lux) + " lux")
+                          "{0:.1f}".format(current_lux) + " lux")
 
                     for relay_pin, on_lux, hysteresis, status, enabled in zip(
                                                         lighting_relay_pins,
