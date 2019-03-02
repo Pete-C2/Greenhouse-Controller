@@ -358,12 +358,15 @@ class HumidityThread(threading.Thread):
 
                     now = datetime.datetime.now().time()
 
-                    airtemp_humidity_sensor.get_data()
-                    debug_log("Air temp: " +
-                          str(airtemp_humidity_sensor.temperature) +
-                          "\u00B0C")
-                    debug_log("Humidity: " +
-                          str(airtemp_humidity_sensor.humidity) + "%RH")
+                    try:
+                         airtemp_humidity_sensor.get_data()
+                         debug_log("Air temp: " +
+                               str(airtemp_humidity_sensor.temperature) +
+                               "\u00B0C")
+                         debug_log("Humidity: " +
+                               str(airtemp_humidity_sensor.humidity) + "%RH")
+                    except:
+                         debug_log("Humidity sensor error")
 
                     time.sleep(control_interval)
 

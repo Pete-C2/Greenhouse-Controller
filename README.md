@@ -32,6 +32,9 @@ See wiki.
 
 ## Changelog
 
+### V0.15
+Added detection of fault in reading humidity sensor.
+
 ### V0.14
 Added detection of fault in reading light sensor. Default to turn lighting on for the timed duration.
 
