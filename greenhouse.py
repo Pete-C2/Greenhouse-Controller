@@ -25,7 +25,6 @@ import am2320
 # Debug logging
 
 def debug_log(log_string):
-     global debug_logging
      if (debug_logging == "Enabled"):
          print(log_string)
 
@@ -88,18 +87,11 @@ def print_config():
 class PropagatorHeaterThread(threading.Thread):
 
      def run(self):
-          global control_interval
-          global propagator_cs_pins
-          global spi_clock_pin
-          global spi_data_pin
-          global units
           global heater_state
           global temps
           global air_temp
           global log_on
           global log_off
-          global set_temperature
-          global logging
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting propagator heater thread")
@@ -197,7 +189,6 @@ class PropagatorHeaterThread(threading.Thread):
 class AirHeaterThread(threading.Thread):
 
      def run(self):
-          global control_interval
           global air_heater_state
           global air_log_on
           global air_log_off
@@ -205,7 +196,7 @@ class AirHeaterThread(threading.Thread):
           debug_log("Starting air heating thread")
 
           sensor = W1ThermSensor() # Assumes just one sensor available
-          
+
           GPIO.setmode(GPIO.BOARD)
           GPIO.setup(air_heating_relay_pin, GPIO.OUT)
           GPIO.output(air_heating_relay_pin, GPIO.LOW)
@@ -266,7 +257,6 @@ class AirHeaterThread(threading.Thread):
 class LightingThread(threading.Thread):
 
      def run(self):
-          global control_interval
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting lighting thread")
@@ -342,7 +332,6 @@ class LightingThread(threading.Thread):
 class HumidityThread(threading.Thread):
 
      def run(self):
-          global control_interval
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting humidity control thread")
@@ -500,8 +489,11 @@ logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
 # Interval in minutes from config file
 log_status = "Off"  # Values: Off -> On -> Stop -> Off
-log_on = 0 # Number of measurement intervals when heater is on
-log_off = 0 # Number of measurement intervals when heater is off
+log_on = 0 # Number of measurement intervals when propagator heater is on
+log_off = 0 # Number of measurement intervals when propagator heater is off
+# TODO: Modify progator logging to cope with  multiple propagator definition
+air_log_on = 0 # Number of measurement intervals when air heater is on
+air_log_off = 0 # Number of measurement intervals when air heater is off
 
 # Control
 control_interval = 10 # seconds. Interval between control measurements
@@ -520,9 +512,6 @@ HumidityThread().start()
 
 @app.route("/")
 def index():
-     global title
-     global log_status
-     global pending_note
      now = datetime.datetime.now()
      timeString = now.strftime("%H:%M on %d-%m-%Y")
      if log_status == "On":
@@ -540,7 +529,6 @@ def index():
 # Seems to be run regardless of which page the post comes from
 def log_button():
      global log_status
-     global set_temperature
      if request.method == "POST":
           # Get the value from the submitted form
           submitted_value = request.form["logging"]
@@ -609,15 +597,15 @@ class LogThread(threading.Thread):
 
      def run(self):
           global log_status
-          global dir
-          global log_interval
-          global propagator_cs_pins
-          global spi_clock_pin
-          global spi_data_pin
-          global units
+          #global dir
+          #global log_interval
+          #global propagator_cs_pins
+          #global spi_clock_pin
+          #global spi_data_pin
+          #global units
           global log_on
           global log_off
-          global set_temperature
+          #global set_temperature
           
           now = datetime.datetime.now()
           filetime = now.strftime("%Y-%m-%d-%H-%M")

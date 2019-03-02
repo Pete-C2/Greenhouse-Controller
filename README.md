@@ -32,6 +32,10 @@ See wiki.
 
 ## Changelog
 
+### V0.16
+Removed unneccessary defintion of global variables.
+Added missing defintion of air temperature logging variables.
+
 ### V0.15
 Added detection of fault in reading humidity sensor.
 
