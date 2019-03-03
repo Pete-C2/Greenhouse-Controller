@@ -36,12 +36,19 @@ See wiki.
 
 ## Changelog
 
+### V0.18
+Added raise exception if humidity sensor fails.
+
+Added e-mail notification of sensor failure or paramter exceeding defined value.
+
 ### V0.17
 Individual monitoring of min, max temperature, heater state, proportion of heating time per propagator.
+
 Separated air heater and propagator heater set temperatures.
 
 ### V0.16
 Removed unneccessary defintion of global variables.
+
 Added missing defintion of air temperature logging variables.
 
 ### V0.15
@@ -85,6 +92,7 @@ Updated to match recommended style https://www.python.org/dev/peps/pep-0008/
 
 ### V0.2
 Converted to Python3
+
 Made file executable
 
 ### V0.1

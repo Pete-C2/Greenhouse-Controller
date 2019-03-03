@@ -82,11 +82,11 @@ class AM2320:
 		#If raw_data 0 + 1 (the returned intruction codes) don't match 0x03 and
 		#0x04 (the instructions which were given) alert the user to the error
 		if ((self.raw_data[0] != 0x03) or (self.raw_data[1] != 0x04)):
-			print("ERROR: recieved bytes 0 and 1 corrupt")
+                        raise AM2320Error("Recieved bytes 0 and 1 corrupt")
 		#If the CRC bytes don't equal the calculated CRC code alert the user to
 		#the error.
 		elif (self.CRC != ((self.raw_data[7] << 8) + self.raw_data[6])):
-			print("CRC error, data corrupt!")
+			raise AM2320Error("CRC error, data corrupt")
 		#Otherwise, everything is fine and calculate the temp/humidity values
 		else:
 			#Bitshift the temperature most significant byte left by 8 bits
@@ -110,3 +110,9 @@ class AM2320:
 			#humidity in % relative humidity, according to the datasheet.
 			self.humidity = ((self.raw_data[2] << 8) \
  + self.raw_data[3])/10.0
+
+class AM2320Error(Exception):
+     def __init__(self, value):
+         self.value = value
+     def __str__(self):
+         return repr(self.value)

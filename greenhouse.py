@@ -13,6 +13,7 @@ import threading
 import time
 import csv
 import sys
+import smtplib
 
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
@@ -80,6 +81,22 @@ def print_config():
      print("  Units = " + units)
      print("  Title = " + title)
 
+def send_email(body):
+     debug_log("Email: " + body)
+     smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
+     smtpserver.ehlo()
+     smtpserver.starttls()
+     smtpserver.ehlo()
+     smtpserver.login(email_address, email_password)
+     from_address = email_address
+     subject = "Alert from Greenhouse Controller"
+     header = "To:" + email_to_address + "\n"
+     header = header + "From: Greenhouse Controller <" + from_address + ">\n"
+     header = header + "Subject:" + subject + "\n"
+     message = header + body + "\n"
+     smtpserver.sendmail(from_address, email_to_address, message)
+     smtpserver.quit()
+
 # Heater control code: if the temperature is too cold then turn the heater on
 # (typically using a relay), else turn it off.
 
@@ -141,10 +158,24 @@ class PropagatorHeaterThread(threading.Thread):
                                    if (tc
                                          > propagators[channel]["max_temperature"]):
                                         propagators[channel]["max_temperature"] = tc
+                                   propagators[channel]["error_count"] = 0
+                                   propagators[channel]["sensor_error"] = False
+                                   propagators[channel]["sensor_alert"] = False
                               except MAX31855Error as e:
                                    tc = "Error"
                                    propagators[channel]["temp"] = "Error: " + e.value
-
+                                   propagators[channel]["sensor_error"] = True
+                                   if (propagators[channel]["error_count"] \
+                                            < alert_sensor):
+                                        propagators[channel]["error_count"] = \
+                                            propagators[channel]["error_count"]+1
+                                   if ((propagators[channel]["error_count"]
+                                            >= alert_sensor)
+                                            and
+                                           ((propagators[channel]["sensor_alert"] == False))):
+                                        send_email("Propagator sensor failed "
+                                                   + propagators[channel]["name"] + ".")
+                                        propagators[channel]["sensor_alert"] = True
 
                               debug_log("Temperature: " + str(tc) + "\u00B0C"
                                         + ".  Set Temperature: "
@@ -181,6 +212,19 @@ class PropagatorHeaterThread(threading.Thread):
                                              propagators[channel]["log_off"] = \
                                                propagators[channel]["log_off"]+1
                                         debug_log("Propagator relay off")
+                                   if (propagators[channel]["temp"]
+                                            >= alert_propagator_temp):
+                                        if (propagators[channel]["alert_state"] == "None"):
+                                             send_email("Greenhouse high propagator temperature alert - "
+                                                        + propagators[channel]["name"]
+                                                        + ". Temperature = "
+                                                        + str(propagators[channel]["temp"])
+                                                        + "degC.")
+                                             debug_log("High temperature alert e-mail sent")
+                                             propagators[channel]["alert_state"] = "Alerted"
+                                   if (propagators[channel]["temp"]
+                                             < (alert_propagator_temp - alert_hysteresis)):
+                                        propagators[channel]["alert_state"] = "None"
                          else:
                               # Propagator is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
@@ -282,6 +326,9 @@ class LightingThread(threading.Thread):
                GPIO.output(relay_pin, GPIO.LOW)
 
           light_sensor = bh1750.BH1750()
+          sensor_error = False
+          error_count = 0
+          sensor_alert = False
 
           try:
                while 1: # Control the lighting forever while powered
@@ -291,12 +338,22 @@ class LightingThread(threading.Thread):
 
                     try:
                          current_lux = light_sensor.get_light_mode()
+                         error_count = 0
+                         sensor_error = False
+                         sensor_alert = False
                     except:
                          debug_log("Light sensor error")
                          current_lux = 0 # Define illumination as pitch black.
                          # If the light sensor fails then the lights will be
                          # turned on for the defined timer duration irrespective
                          # of actual illumination.
+                         sensor_error = True
+                         if (error_count < alert_sensor):
+                              error_count = error_count + 1
+                         if ((error_count >= alert_sensor)
+                                  and (sensor_alert == False)):
+                              send_email("Light sensor failed.")
+                              sensor_alert = True
 
                     now = datetime.datetime.now().time()
 
@@ -354,6 +411,10 @@ class HumidityThread(threading.Thread):
 
           airtemp_humidity_sensor = am2320.AM2320()
 
+          alert_state = "None"
+          sensor_error = False
+          error_count = 0
+          sensor_alert = False
 
           try:
                while 1: # Control the humidity forever while powered
@@ -365,13 +426,38 @@ class HumidityThread(threading.Thread):
 
                     try:
                          airtemp_humidity_sensor.get_data()
+                         error_count = 0
+                         sensor_error = False
+                         sensor_alert = False
+                    except am2320.AM2320Error as e:
+                         debug_log("Humidity sensor error: " + e.value)
+                         sensor_error = True
+                         if (error_count < alert_sensor):
+                              error_count = error_count + 1
+                         if ((error_count >= alert_sensor)
+                                  and (sensor_alert == False)):
+                              send_email("Humidity sensor failed.")
+                              sensor_alert = True
+
+                    if (sensor_error == False):
                          debug_log("Air temp: " +
                                str(airtemp_humidity_sensor.temperature) +
                                "\u00B0C")
                          debug_log("Humidity: " +
                                str(airtemp_humidity_sensor.humidity) + "%RH")
-                    except:
-                         debug_log("Humidity sensor error")
+                         if (airtemp_humidity_sensor.temperature
+                                  >= alert_air_temp):
+                              if (alert_state == "None"):
+                                   send_email("Greenhouse high air temperature alert. Temperature = "
+                                              + str(airtemp_humidity_sensor.temperature)
+                                              + "degC.")
+                                   debug_log("High temperature alert e-mail sent")
+                                   alert_state = "Alerted"
+                         if (airtemp_humidity_sensor.temperature
+                                   < (alert_air_temp - alert_hysteresis)):
+                              alert_state = "None"
+                    else:
+                         pass # Add code to monitor errors and send e-mail alert
 
                     time.sleep(control_interval)
 
@@ -473,7 +559,11 @@ for child in propagator_sensors:
                              "log_off": 0, # No. of measurements heater is off
                              "min_temperature": 100, # greater than min will be
                              "max_temperature": -100, # less than max will be
-                             "heater_state": "Undefined"} 
+                             "heater_state": "Undefined",
+                             "alert_state": "None", # Alert for high temperature
+                             "sensor_error": False,
+                             "error_count": 0,
+                             "sensor_alert": False} # Alert for sensor failure
                              # Default values pending measurements
      channel = channel + 1
 
@@ -511,6 +601,7 @@ for child in light_schedule:
 logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
 # Interval in minutes from config file
+
 log_status = "Off"  # Values: Off -> On -> Stop -> Off
 
 air_log_on = 0 # Number of measurement intervals when air heater is on
@@ -521,6 +612,25 @@ control_interval = 10 # seconds. Interval between control measurements
 
 propagator_set_temperature = 0 # Default value pending reading of correct value
 air_set_temperature = 0 # Default value pending reading of correct value
+
+# Get e-mail details
+email = ET.parse(dir+"/email.xml")
+emailroot = email.getroot()
+user_details = emailroot.find("USER")
+email_address = user_details.find("EMAIL").text
+email_password = user_details.find("PASSWORD").text
+
+email_alerts = emailroot.find("ALERTS")
+email_to_address = email_alerts.find("TO").text
+alert_restart = email_alerts.find("RESTART").text
+alert_sensor = int(email_alerts.find("SENSOR-FAIL").text)
+alert_propagator_temp = int(email_alerts.find("PROPAGATOR-TEMP").text)
+alert_air_temp = int(email_alerts.find("AIR-TEMP").text)
+alert_hysteresis = int(email_alerts.find("HYSTERESIS").text) # How much
+                         # temperature must fall before a new alert is generated
+
+if (alert_restart == "Enabled"):
+     send_email("Greenhouse controller restart")
 
 if (display_config == "Enabled"):
      print_config()
