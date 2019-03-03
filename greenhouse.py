@@ -87,12 +87,10 @@ def print_config():
 class PropagatorHeaterThread(threading.Thread):
 
      def run(self):
-          global heater_state
-          global temps
+          global propagators
           global air_temp
-          global log_on
-          global log_off
-
+          global propagator_set_temperature
+          
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting propagator heater thread")
 
@@ -109,11 +107,11 @@ class PropagatorHeaterThread(threading.Thread):
 
                     now = datetime.datetime.now().time()
 
-                    set_temperature = temperature_schedule[1]["temp"]
+                    propagator_set_temperature = temperature_schedule[1]["temp"]
                     # Default to the first timed temperature
                     for count in temperature_schedule:
                           if (now >= temperature_schedule[count]["time"]):
-                              set_temperature = temperature_schedule \
+                              propagator_set_temperature = temperature_schedule \
                                                 [count]["temp"]
                               # Keep selecting a new temperature if the time is
                               # later than the start of the time schedule
@@ -125,58 +123,75 @@ class PropagatorHeaterThread(threading.Thread):
                                                        spi_data_pin, units,
                                                        GPIO.BOARD))
 
-                    for thermocouple, relay_pin, cal, meas, enabled in zip(
-                                                        thermocouples,
-                                                        propagator_relay_pins,
-                                                        propagator_calibrate,
-                                                        propagator_measured,
-                                                        propagator_enabled):
+                    for thermocouple, relay_pin, cal, meas, enabled in zip \
+                            (thermocouples,
+                            propagator_relay_pins,
+                            propagator_calibrate,
+                            propagator_measured,
+                            propagator_enabled):
                          if (enabled == "Enabled"):
                               if (channel == 1):
                                    air_temp = int(thermocouple.get_rj())
                               try:
                                    tc = int(thermocouple.get()) + cal - meas
-                                   temps[channel]["temp"] = tc
+                                   propagators[channel]["temp"] = tc
+                                   if (tc
+                                         < propagators[channel]["min_temperature"]):
+                                        propagators[channel]["min_temperature"] = tc
+                                   if (tc
+                                         > propagators[channel]["max_temperature"]):
+                                        propagators[channel]["max_temperature"] = tc
                               except MAX31855Error as e:
                                    tc = "Error"
-                                   temps[channel]["temp"] = "Error: " + e.value
+                                   propagators[channel]["temp"] = "Error: " + e.value
 
-                              channel = channel + 1
 
                               debug_log("Temperature: " + str(tc) + "\u00B0C"
                                         + ".  Set Temperature: "
-                                        + str(set_temperature)
+                                        + str(propagator_set_temperature)
                                         + "\u00B0C")
+                              debug_log("Min: "
+                                        + str(propagators[channel]["min_temperature"])
+                                        + ", Max: "
+                                        + str(propagators[channel]["max_temperature"]))
 
                               if tc == "Error":
                                    GPIO.output(relay_pin, GPIO.LOW)
                                    # Turn off Relay (fault condition -
                                    # avoid overheating)
-                                   heater_state = "Error: Off"
+                                   propagators[channel]["heater_state"] \
+                                                        = "Error: Off"
                                    debug_log("Error: Propagator relay off")
                               else:
-                                   if tc < set_temperature:
+                                   if tc < propagator_set_temperature:
                                         GPIO.output(relay_pin, GPIO.HIGH)
                                         # Turn on relay
-                                        heater_state = "On"
+                                        propagators[channel]["heater_state"] \
+                                                             = "On"
                                         if (log_status == "On"):
-                                             log_on = log_on + 1
+                                             propagators[channel]["log_on"] = \
+                                               propagators[channel]["log_on"]+1
                                         debug_log("Propagator relay on")
                                    else:
                                         GPIO.output(relay_pin, GPIO.LOW)
                                         # Turn off relay
-                                        heater_state = "Off"
+                                        propagators[channel]["heater_state"] \
+                                                             = "Off"
                                         if (log_status == "On"):
-                                             log_off = log_off + 1
+                                             propagators[channel]["log_off"] = \
+                                               propagators[channel]["log_off"]+1
                                         debug_log("Propagator relay off")
                          else:
                               # Propagator is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
                               # Turn off relay
-                              heater_state = "Off"
+                              propagators[channel]["heater_state"] = "Off"
                               if (log_status == "On"):
-                                   log_off = log_off + 1
+                                   propagators[channel]["log_off"] = \
+                                     propagators[channel]["log_off"] + 1
                               debug_log("Propagator disabled - Relay off")
+
+                         channel = channel + 1
                               
 
                     for thermocouple in thermocouples:
@@ -192,6 +207,7 @@ class AirHeaterThread(threading.Thread):
           global air_heater_state
           global air_log_on
           global air_log_off
+          global air_set_temperature
 
           debug_log("Starting air heating thread")
 
@@ -209,11 +225,11 @@ class AirHeaterThread(threading.Thread):
 
                     now = datetime.datetime.now().time()
 
-                    set_temperature = air_temperature_schedule[1]["temp"]
+                    air_set_temperature = air_temperature_schedule[1]["temp"]
                     # Default to the first timed temperature
                     for count in air_temperature_schedule:
                           if (now >= air_temperature_schedule[count]["time"]):
-                              set_temperature = air_temperature_schedule \
+                              air_set_temperature = air_temperature_schedule \
                                                 [count]["temp"]
                               # Keep selecting a new temperature if the time is
                               # later than the start of the time schedule
@@ -225,7 +241,7 @@ class AirHeaterThread(threading.Thread):
                          debug_log("Air temperature: " +
                                    "{0:+.1f}".format(air_temperature) +
                                    "\u00B0C")
-                         if air_temperature < set_temperature:
+                         if air_temperature < air_set_temperature:
                               # Turn air heater relay on
                               GPIO.output(air_heating_relay_pin, GPIO.HIGH)
                               # Turn on relay
@@ -366,7 +382,6 @@ app = Flask(__name__)
 
 # Initialisation
 
-heater_state = "Off"
 debug_logging = "Off"
 display_config = "Off"
 
@@ -414,6 +429,7 @@ propagator_calibrate = []
 propagator_measured = []
 propagator_channel_names = []
 propagator_enabled = []
+
 for child in propagator_sensors:
      propagator_cs_pins.append(int(child.find("CSPIN").text))
      propagator_relay_pins.append(int(child.find("RELAY").text))
@@ -447,11 +463,18 @@ for child in lighting_sensors:
 units = display.find("UNITS").text.lower()
 title = display.find("TITLE").text
 
-# Create a dictionary called temps to store the temperatures and names:
-temps = {}
+# Create a dictionary called propagators to store the measurements and names:
+propagators = {}
 channel = 1
 for child in propagator_sensors:
-     temps[channel] = {"name": child.find("NAME").text, "temp": ""}
+     propagators[channel] = {"name": child.find("NAME").text,
+                             "temp": "",
+                             "log_on": 0, # No. of measurements heater is on
+                             "log_off": 0, # No. of measurements heater is off
+                             "min_temperature": 100, # greater than min will be
+                             "max_temperature": -100, # less than max will be
+                             "heater_state": "Undefined"} 
+                             # Default values pending measurements
      channel = channel + 1
 
 # Read temperature/lux time schedules
@@ -489,16 +512,15 @@ logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
 # Interval in minutes from config file
 log_status = "Off"  # Values: Off -> On -> Stop -> Off
-log_on = 0 # Number of measurement intervals when propagator heater is on
-log_off = 0 # Number of measurement intervals when propagator heater is off
-# TODO: Modify progator logging to cope with  multiple propagator definition
+
 air_log_on = 0 # Number of measurement intervals when air heater is on
 air_log_off = 0 # Number of measurement intervals when air heater is off
 
 # Control
 control_interval = 10 # seconds. Interval between control measurements
 
-set_temperature = 0 # Default value pending reading of correct value
+propagator_set_temperature = 0 # Default value pending reading of correct value
+air_set_temperature = 0 # Default value pending reading of correct value
 
 if (display_config == "Enabled"):
      print_config()
@@ -553,9 +575,8 @@ def temp():
                 "title": title,
                 "time": timeString,
                 "air": air_temp,
-                "set": set_temperature,
-                "temps": temps,
-                "heater": heater_state,
+                "set": propagator_set_temperature,
+                "propagators": propagators,
                 "units": units.upper()
                 }
 
@@ -597,15 +618,8 @@ class LogThread(threading.Thread):
 
      def run(self):
           global log_status
-          #global dir
-          #global log_interval
-          #global propagator_cs_pins
-          #global spi_clock_pin
-          #global spi_data_pin
-          #global units
           global log_on
           global log_off
-          #global set_temperature
           
           now = datetime.datetime.now()
           filetime = now.strftime("%Y-%m-%d-%H-%M")
@@ -614,10 +628,12 @@ class LogThread(threading.Thread):
                logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                row = ["Date-Time"]
                row.append("Set Temp")
-               for channels in temps:
-                    row.append(temps[channels]["name"])
-               row.append("Heating Active (%)")
                row.append("Air Temp")
+               for channels in propagators:
+                    row.append(propagators[channels]["name"])
+                    row.append("Heating Active (%)")
+                    row.append('Min Temp')
+                    row.append('Max Temp')
                row.append("Light Level")
                row.append("Air Temp 2")
                row.append("Humidity")
@@ -633,23 +649,22 @@ class LogThread(threading.Thread):
                     logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                     now = datetime.datetime.now()
                     row = [now.strftime("%d/%m/%Y %H:%M")]
-                    row.append(set_temperature)
-                    for channels in temps:
-                         row.append(temps[channels]["temp"])
-                    if (log_off == 0):
-                         if (log_on > 1):
-                              row.append("100%") # Heater was always on
-                         else:
-                              row.append("No measurements")
-                              # No measurement of heater on or off!
-                    else:
-                         row.append(int(100*log_on/(log_on+log_off)))
-                         # Calculate the percentage of time the heater was on
-
-                    log_on = 0 # Restart heater proportion measurement
-                    log_off = 0
-
+                    row.append(propagator_set_temperature)
                     row.append(air_temp)
+                    for channels in propagators:
+                         row.append(propagators[channels]["temp"])
+                         if (propagators[channels]["log_off"] == 0):
+                              if (propagators[channels]["log_on"] > 1):
+                                   row.append(100) # Heater was always on
+                              else:
+                                   row.append("No measurements")
+                                   # No measurement of heater on or off!
+                         else:
+                              row.append(int(100*propagators[channels]["log_on"]/(propagators[channels]["log_on"]+propagators[channels]["log_off"])))
+                              # Calculate the percentage of time the heater was on
+
+                         row.append(propagators[channels]["min_temperature"])
+                         row.append(propagators[channels]["max_temperature"])
 
                     row.append(light_sensor.get_light_mode())
 
@@ -659,6 +674,12 @@ class LogThread(threading.Thread):
                     row.append(onewire_sensor.get_temperature())
                     
                     logfile.writerow(row)
+                    
+                    log_on = 0 # Restart heater proportion measurement
+                    log_off = 0
+                    min_temperature = propagators[1]['temp'] # Temporary code to capture min and max
+                    max_temperature = propagators[1]['temp']
+                    
                time.sleep(log_interval)
           log_status = "Off"
 

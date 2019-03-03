@@ -9,15 +9,19 @@ Requires:
   - sudo apt-get install python3-flask
 - A [Raspberry Pi](http://www.raspberrypi.org/).
 - Hardware with [MAX31855 temperature monitors](https://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/MAX31855.html).
-- Hardware to control a heater element. In my case this was a propagator with a faulty control unit re-wired to drive the relay from the Raspberry Pi.
+- Hardware to control a heater elements. In my case this was one propagator with a faulty control unit re-wired to drive the relay from the Raspberry Pi and an eight-relay board to switch mains voltages.
 - Hardware with [BH1750 Digital 16-bit ambient light sensor](http://www.mouser.com/ds/2/348/bh1750fvi-e-186247.pdf).
 - Hardware with [AM2320 Humidity and temperature sensor](https://learn.adafruit.com/adafruit-am2320-temperature-humidity-i2c-sensor/overview).
+- Hardeare with [DS18B20 one wire temperature sensor](https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf)
 
 Installation:
 - Copy files to a folder on the Raspberry Pi.
 - Edit /etc/rc.local to autorun application:
    - sudo nano /etc/rc.local
    - Add: python /home/pi/.../greenhouse.py where ... is the location of your file.
+- Install supplementary software:
+  - sudo apt-get install python3-flask
+  - sudo apt-get install python3-w1thermsensor
 - Edit config.xml to define your system hardware. The defaults match my hardware.
     
 Recommendations (to make life easier):
@@ -31,6 +35,10 @@ Recommendations (to make life easier):
 See wiki.
 
 ## Changelog
+
+### V0.17
+Individual monitoring of min, max temperature, heater state, proportion of heating time per propagator.
+Separated air heater and propagator heater set temperatures.
 
 ### V0.16
 Removed unneccessary defintion of global variables.

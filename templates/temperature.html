@@ -18,22 +18,23 @@
     
     <P>Air Temperature: {{ air }}&deg;{{ units }} (approx)</P>
 
-    <P>Heater Set Temperature: {{ set }}&deg;{{ units }}</P>
+    <P>Propagator Heater Set Temperature: {{ set }}&deg;{{ units }}</P>
 
-    <P>Heater State: {{ heater }}</P>
-
-    
     <H2>Sensor Temperatures</H2>
     
-    <P>{% for temp in temps %} </P>
+    <P>{% for propagator in propagators %} </P>
     <TABLE CLASS="temptable">
       <TR>
         <TD>
         
-        <P>{{ temps[temp].name }}</P></TD>
+        <P>{{ propagators[propagator].name }}</P></TD>
         <TD>
         
-        <P>{{ temps[temp].temp }}&deg;{{ units }}</P></TD>
+        <P>{{ propagators[propagator].temp }}&deg;{{ units }}
+
+        <P>Heater State: {{ propagators[propagator].heater_state }}</P>
+
+</P></TD>
       </TR>
     </TABLE>
     
