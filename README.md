@@ -36,6 +36,11 @@ See wiki.
 
 ## Changelog
 
+### V0.19
+Added all parameters to web status page.
+
+Modified all measurement threads to be the only place in which sensors are read, saving readings for use elsewhere.
+
 ### V0.18
 Added raise exception if humidity sensor fails.
 

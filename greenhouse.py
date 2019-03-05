@@ -105,7 +105,7 @@ class PropagatorHeaterThread(threading.Thread):
 
      def run(self):
           global propagators
-          global air_temp
+          global controller_temp
           global propagator_set_temperature
           
           GPIO.setmode(GPIO.BOARD)
@@ -148,7 +148,7 @@ class PropagatorHeaterThread(threading.Thread):
                             propagator_enabled):
                          if (enabled == "Enabled"):
                               if (channel == 1):
-                                   air_temp = int(thermocouple.get_rj())
+                                   controller_temp = int(thermocouple.get_rj())
                               try:
                                    tc = int(thermocouple.get()) + cal - meas
                                    propagators[channel]["temp"] = tc
@@ -237,7 +237,6 @@ class PropagatorHeaterThread(threading.Thread):
 
                          channel = channel + 1
                               
-
                     for thermocouple in thermocouples:
                          thermocouple.cleanup()
                     time.sleep(control_interval)
@@ -252,6 +251,7 @@ class AirHeaterThread(threading.Thread):
           global air_log_on
           global air_log_off
           global air_set_temperature
+          global heating_air_temp
 
           debug_log("Starting air heating thread")
 
@@ -281,6 +281,8 @@ class AirHeaterThread(threading.Thread):
                     if (air_enabled == "Enabled"):
                          air_temperature = sensor.get_temperature() \
                                              + air_calibrate - air_measured
+                         # Add code to detect sensor failure
+                         heating_air_temp = air_temperature
 
                          debug_log("Air temperature: " +
                                    "{0:+.1f}".format(air_temperature) +
@@ -304,7 +306,8 @@ class AirHeaterThread(threading.Thread):
                          # Air heating disabled
                          GPIO.output(air_heating_relay_pin, GPIO.LOW)
                          # Turn off relay
-                         air_heater_state = "Off"
+                         air_heater_state = "Disabled - Off"
+                         heating_air_temp = "Not measured"
                          if (log_status == "On"):
                               air_log_off = air_log_off + 1
                          debug_log("Air heating disabled - relay off")
@@ -317,6 +320,8 @@ class AirHeaterThread(threading.Thread):
 class LightingThread(threading.Thread):
 
      def run(self):
+          global lighting
+          global light_level
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting lighting thread")
@@ -335,14 +340,18 @@ class LightingThread(threading.Thread):
                     debug_log("")
                     debug_log("Measuring light...    %s" %
                           (time.ctime(time.time())))
+                    channel = 1
 
                     try:
                          current_lux = light_sensor.get_light_mode()
+                         light_level = current_lux
                          error_count = 0
                          sensor_error = False
                          sensor_alert = False
                     except:
                          debug_log("Light sensor error")
+                         light_level = "Error"
+                         
                          current_lux = 0 # Define illumination as pitch black.
                          # If the light sensor fails then the lights will be
                          # turned on for the defined timer duration irrespective
@@ -380,22 +389,27 @@ class LightingThread(threading.Thread):
                                         status = "On"
                                         # Turn on relay
                                         GPIO.output(relay_pin, GPIO.HIGH)
+                                        lighting[channel]["light_state"] = "On"
                                         debug_log("Light relay on")
                                    elif (current_lux > (on_lux + hysteresis)):
                                         status = "Off"
                                         # Turn off relay
                                         GPIO.output(relay_pin, GPIO.LOW)
+                                        lighting[channel]["light_state"] = "Off"
                                         debug_log("Light relay off")
                                    else:
                                         debug_log("Light level within state change hysteresis")
                               else:
                                    # set_status should be Off (but not checked)
                                    GPIO.output(relay_pin, GPIO.LOW)
+                                   lighting[channel]["light_state"] = "Timer Off"
                                    debug_log("Light relay off by time schedule")
                          else:
                               # Lighting is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
+                              lighting[channel]["light_state"] = "Disabled - Off"
                               debug_log("Light disabled - relay off")
+                         channel = channel + 1
 
                     time.sleep(control_interval)
 
@@ -405,6 +419,8 @@ class LightingThread(threading.Thread):
 class HumidityThread(threading.Thread):
 
      def run(self):
+          global air_temp
+          global humidity_level
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting humidity control thread")
@@ -445,6 +461,8 @@ class HumidityThread(threading.Thread):
                                "\u00B0C")
                          debug_log("Humidity: " +
                                str(airtemp_humidity_sensor.humidity) + "%RH")
+                         air_temp = airtemp_humidity_sensor.temperature
+                         humidity_level = airtemp_humidity_sensor.humidity
                          if (airtemp_humidity_sensor.temperature
                                   >= alert_air_temp):
                               if (alert_state == "None"):
@@ -457,6 +475,9 @@ class HumidityThread(threading.Thread):
                                    < (alert_air_temp - alert_hysteresis)):
                               alert_state = "None"
                     else:
+                         humidity_level = "Humidity sensor error"
+                         air_temp = "Humidity sensor error"
+
                          pass # Add code to monitor errors and send e-mail alert
 
                     time.sleep(control_interval)
@@ -549,7 +570,7 @@ for child in lighting_sensors:
 units = display.find("UNITS").text.lower()
 title = display.find("TITLE").text
 
-# Create a dictionary called propagators to store the measurements and names:
+# Create dictionaries and variables to store measurements
 propagators = {}
 channel = 1
 for child in propagator_sensors:
@@ -566,6 +587,21 @@ for child in propagator_sensors:
                              "sensor_alert": False} # Alert for sensor failure
                              # Default values pending measurements
      channel = channel + 1
+
+light_level = 0
+channel = 1
+lighting = {}
+for child in lighting_sensors:
+     lighting[channel] = {"name": child.find("NAME").text,
+                         "light_state": "Undefined"}
+     channel = channel + 1
+
+humidity_level = 0
+air_temp = 0
+
+heating_air_temp = 0
+air_heater_state = "Undefined"
+
 
 # Read temperature/lux time schedules
 temperature_schedule = {}
@@ -680,14 +716,41 @@ def log_button():
 def temp():
      now = datetime.datetime.now()
      timeString = now.strftime("%H:%M on %d-%m-%Y")
+     try:
+          light = "{:.1f}".format(light_level)
+     except:
+          light = light_level
+
+     try:
+          humidity = "{:.1f}".format(humidity_level)
+     except:
+          humidity = humidity_level
+
+     try:
+          air = "{:.1f}".format(air_temp)
+     except:
+          air = air_temp
+
+     try:
+          heating_air = "{:.1f}".format(heating_air_temp)
+     except:
+          heating_air = heating_air_temp
+          
 
      templatedata = {
                 "title": title,
                 "time": timeString,
-                "air": air_temp,
+                "controller": controller_temp,
                 "set": propagator_set_temperature,
                 "propagators": propagators,
-                "units": units.upper()
+                "units": units.upper(),
+                "light": light,
+                "lights": lighting,
+                "air": air,
+                "humidity": humidity,
+                "heatingair": heating_air,
+                "heater": air_heater_state,
+                "heaterset": air_set_temperature
                 }
 
      return render_template("temperature.html", **templatedata)
@@ -742,9 +805,11 @@ class LogThread(threading.Thread):
                for channels in propagators:
                     row.append(propagators[channels]["name"])
                     row.append("Heating Active (%)")
-                    row.append('Min Temp')
-                    row.append('Max Temp')
-               row.append("Light Level")
+                    row.append("Min Temp")
+                    row.append("Max Temp")
+               row.append("Light level")
+               for channels in propagators:
+                    row.append(lighting[channels]["name"] + "Light State")
                row.append("Air Temp 2")
                row.append("Humidity")
                row.append("Air Temp 3")
@@ -760,7 +825,7 @@ class LogThread(threading.Thread):
                     now = datetime.datetime.now()
                     row = [now.strftime("%d/%m/%Y %H:%M")]
                     row.append(propagator_set_temperature)
-                    row.append(air_temp)
+                    row.append(controller_temp)
                     for channels in propagators:
                          row.append(propagators[channels]["temp"])
                          if (propagators[channels]["log_off"] == 0):
@@ -775,20 +840,22 @@ class LogThread(threading.Thread):
 
                          row.append(propagators[channels]["min_temperature"])
                          row.append(propagators[channels]["max_temperature"])
+                         propagators[channels]["log_on"] = 0 # Reset measurements
+                         propagators[channels]["log_off"] = 0
+                         propagators[channels]["min_temperature"] = \
+                              propagators[channels]["temp"]
+                         propagators[channels]["max_temperature"] = \
+                              propagators[channels]["temp"]
 
-                    row.append(light_sensor.get_light_mode())
+                    row.append(light_level)
+                    for channels in propagators:
+                         row.append(lighting[channels]["light_level"])
 
-                    airtemp_humidity_sensor.get_data()
-                    row.append(airtemp_humidity_sensor.temperature)
-                    row.append(airtemp_humidity_sensor.humidity)
-                    row.append(onewire_sensor.get_temperature())
+                    row.append(air_temp)
+                    row.append(humidity_level)
+                    row.append(heating_air_temp)
                     
                     logfile.writerow(row)
-                    
-                    log_on = 0 # Restart heater proportion measurement
-                    log_off = 0
-                    min_temperature = propagators[1]['temp'] # Temporary code to capture min and max
-                    max_temperature = propagators[1]['temp']
                     
                time.sleep(log_interval)
           log_status = "Off"

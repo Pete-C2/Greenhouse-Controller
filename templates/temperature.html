@@ -7,7 +7,7 @@
     <TITLE>{{ title }}</TITLE>
     <LINK REL="stylesheet" TYPE="text/css" 
     HREF="{{ url_for('static', filename='style.css') }}">
-    <META HTTP-EQUIV="refresh" CONTENT="2">
+    <META HTTP-EQUIV="refresh" CONTENT="10">
   </HEAD>
   
   <BODY>
@@ -15,12 +15,13 @@
     <H1>{{ title }}</H1>
     
     <P>Current time is: {{ time }}</P>
+    <H2>Propagators</H2>
     
-    <P>Air Temperature: {{ air }}&deg;{{ units }} (approx)</P>
+    <P>Controller internal air Temperature: {{ controller }}&deg;{{ units }}</P>
 
     <P>Propagator Heater Set Temperature: {{ set }}&deg;{{ units }}</P>
 
-    <H2>Sensor Temperatures</H2>
+    <H3>Propagator Temperatures</H3>
     
     <P>{% for propagator in propagators %} </P>
     <TABLE CLASS="temptable" BORDER="1" CELLPADDING="10">
@@ -39,5 +40,36 @@
     </TABLE>
     
     <P>{% endfor %} </P>
+
+    <H2>Lighting</H2>
+    <P>Light level: {{ light }} lux</P>
+
+    <P>{% for light in lights %} </P>
+    <TABLE CLASS="temptable" BORDER="1" CELLPADDING="10">
+      <TR>
+        <TD>
+        
+        <P>{{ lights[light].name }}</P></TD>
+        <TD>
+        
+
+        <P>Light State: {{ lights[light].light_state }}</P>
+
+</TD>
+      </TR>
+    </TABLE>
+    
+    <P>{% endfor %} </P>
+
+    <H2>Humidity sensor</H2>
+    <P>Air Temperature: {{ air }}&deg;{{ units }}</P>
+    <P>Humidity: {{ humidity }}% RH</P>
+
+    <H2>Air heating</H2>
+    <P>Air Temperature: {{ heatingair }}&deg;{{ units }}</P>
+    <P>Heater state: {{ heater }}</P>
+    <P>Heater set temperature: {{ heaterset }}&deg;{{ units }}</P>
+
+
   </BODY>
 </HTML>
