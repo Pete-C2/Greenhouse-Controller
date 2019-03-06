@@ -36,6 +36,9 @@ See wiki.
 
 ## Changelog
 
+### V0.20
+Corrected CSV logging.
+
 ### V0.19
 Added all parameters to web status page.
 

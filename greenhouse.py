@@ -797,6 +797,7 @@ class LogThread(threading.Thread):
           now = datetime.datetime.now()
           filetime = now.strftime("%Y-%m-%d-%H-%M")
           filename=dir+"/logging/"+filetime+"_temperature_log.csv"
+          debug_log("Logging started: " + filename)
           with open(filename, "at") as csvfile:
                logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                row = ["Date-Time"]
@@ -808,16 +809,12 @@ class LogThread(threading.Thread):
                     row.append("Min Temp")
                     row.append("Max Temp")
                row.append("Light level")
-               for channels in propagators:
-                    row.append(lighting[channels]["name"] + "Light State")
+               for channels in lighting:
+                    row.append(lighting[channels]["name"] + " Light State")
                row.append("Air Temp 2")
                row.append("Humidity")
                row.append("Air Temp 3")
                logfile.writerow(row)
-
-          light_sensor = bh1750.BH1750()
-          airtemp_humidity_sensor = am2320.AM2320()
-          onewire_sensor = W1ThermSensor()
 
           while log_status == "On":
                with open(filename, "at") as csvfile:
@@ -848,8 +845,8 @@ class LogThread(threading.Thread):
                               propagators[channels]["temp"]
 
                     row.append(light_level)
-                    for channels in propagators:
-                         row.append(lighting[channels]["light_level"])
+                    for channels in lighting:
+                         row.append(lighting[channels]["light_state"])
 
                     row.append(air_temp)
                     row.append(humidity_level)
