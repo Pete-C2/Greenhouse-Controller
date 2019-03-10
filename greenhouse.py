@@ -18,6 +18,7 @@ import smtplib
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
 from w1thermsensor import W1ThermSensor
+from influxdb import InfluxDBClient
 
 from max31855 import MAX31855, MAX31855Error
 import bh1750
@@ -786,6 +787,18 @@ def cancel():
 # Logging code: write a CSV file with header and then one set of sensor
 # measurements per interval
 
+def PercentOn(on, off):
+     if (off == 0):
+          if (on > 1):
+               result = 100 # Heater was always on
+          else:
+               result = "No measurements"
+               # No measurement of heater on or off!
+     else:
+          # Calculate the percentage of time heater was on
+          result = int(100 * (on / (on + off)))
+     return (result)
+
 
 class LogThread(threading.Thread):
 
@@ -795,6 +808,8 @@ class LogThread(threading.Thread):
           global log_off
           
           now = datetime.datetime.now()
+
+          # CSV logging initialisation
           filetime = now.strftime("%Y-%m-%d-%H-%M")
           filename=dir+"/logging/"+filetime+"_temperature_log.csv"
           debug_log("Logging started: " + filename)
@@ -816,7 +831,20 @@ class LogThread(threading.Thread):
                row.append("Air Temp 3")
                logfile.writerow(row)
 
+          # InfluxDB logging initialisation
+          host = "localhost"
+          port = 8086
+          user = "root"
+          password = "root"
+           
+          # The database we created
+          dbname = "greenhouse"
+
+          # Create the InfluxDB object
+          database = InfluxDBClient(host, port, user, password, dbname)
+
           while log_status == "On":
+               # CSV logging
                with open(filename, "at") as csvfile:
                     logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                     now = datetime.datetime.now()
@@ -825,16 +853,8 @@ class LogThread(threading.Thread):
                     row.append(controller_temp)
                     for channels in propagators:
                          row.append(propagators[channels]["temp"])
-                         if (propagators[channels]["log_off"] == 0):
-                              if (propagators[channels]["log_on"] > 1):
-                                   row.append(100) # Heater was always on
-                              else:
-                                   row.append("No measurements")
-                                   # No measurement of heater on or off!
-                         else:
-                              row.append(int(100*propagators[channels]["log_on"]/(propagators[channels]["log_on"]+propagators[channels]["log_off"])))
-                              # Calculate the percentage of time the heater was on
-
+                         row.append(PercentOn(propagators[channels]["log_on"],
+                                              propagators[channels]["log_off"]))
                          row.append(propagators[channels]["min_temperature"])
                          row.append(propagators[channels]["max_temperature"])
                          propagators[channels]["log_on"] = 0 # Reset measurements
@@ -853,7 +873,48 @@ class LogThread(threading.Thread):
                     row.append(heating_air_temp)
                     
                     logfile.writerow(row)
-                    
+
+               # Database logging
+               
+               iso = time.ctime() # temporary resolving database writing
+               session = "greenhouse"
+               measurements = {}
+               measurements.update({"Set Temp": propagator_set_temperature})
+               measurements.update({"Air Temp": controller_temp})
+               for channels in propagators:
+                    measurements.update({propagators[channels]["name"] + " temp": \
+                                         propagators[channels]["temp"]})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Heating Active (%)": \
+                                              PercentOn(
+                                              propagators[channels]["log_on"],
+                                              propagators[channels]["log_off"])})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Min Temp": \
+                                         propagators[channels]["min_temperature"]})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Max Temp": \
+                                         propagators[channels]["max_temperature"]})
+               measurements.update({"Light level": light_level})
+               for channels in lighting:
+                    measurements.update({lighting[channels]["name"] + \
+                              " Light State": lighting[channels]["light_state"]})
+               measurements.update({"Air Temp 2": air_temp})
+               measurements.update({"Humidity": humidity_level})
+               measurements.update({"Air Temp 3": heating_air_temp})
+               
+
+               json_body = [
+               {
+                   "measurement": session,
+                   "time": now.strftime("%Y%m%d%H%M"),
+                   "fields": measurements
+               }
+               ]
+
+               # Write JSON to InfluxDB
+               database.write_points(json_body)
+
                time.sleep(log_interval)
           log_status = "Off"
 

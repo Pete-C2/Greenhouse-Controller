@@ -1,18 +1,23 @@
 # Greenhouse Controller
 
 
-Initial code for a single-channel temperature monitor with output to control a relay powering a propagator heater element.
+Greenhouse Controllder to monitor and control:
+- Multiple temperature monitors, each controlling a plant propagator with outputs to control a relay powering a propagator heater element.
+- Air temperature monitor controlling an air heater.
+- Light level monitor controlling lighting.
+- Temperature and humidity monitor.
 
 Requires:
 - The [GPIO Library](https://code.google.com/p/raspberry-gpio-python/) (Already on most Raspberry Pi OS builds).
 - The [Flask web server](https://www.raspberrypi.org/learning/python-web-server-with-flask/worksheet/). Install command:
   - sudo apt-get install python3-flask
-- A [Raspberry Pi](http://www.raspberrypi.org/).
+- A [Raspberry Pi](http://www.raspberrypi.org/) with Raspbian Stretch OS installed (require python3.5 to support Influxdb).
+- Database setup in [Influxdb](https://docs.influxdata.com/influxdb/v1.7/).
 - Hardware with [MAX31855 temperature monitors](https://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/MAX31855.html).
 - Hardware to control a heater elements. In my case this was one propagator with a faulty control unit re-wired to drive the relay from the Raspberry Pi and an eight-relay board to switch mains voltages.
 - Hardware with [BH1750 Digital 16-bit ambient light sensor](http://www.mouser.com/ds/2/348/bh1750fvi-e-186247.pdf).
 - Hardware with [AM2320 Humidity and temperature sensor](https://learn.adafruit.com/adafruit-am2320-temperature-humidity-i2c-sensor/overview).
-- Hardeare with [DS18B20 one wire temperature sensor](https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf)
+- Hardware with [DS18B20 one wire temperature sensor](https://datasheets.maximintegrated.com/en/ds/DS18B20.pdf)
 
 Installation:
 - Copy files to a folder on the Raspberry Pi.
@@ -22,6 +27,19 @@ Installation:
 - Install supplementary software:
   - sudo apt-get install python3-flask
   - sudo apt-get install python3-w1thermsensor
+  - Install Influxdb and assume that Raspbian Stretch OS is installed. My instructions are based on [How to install Grafana+InfluxDB on the Raspberry Pi](https://www.circuits.dk/install-grafana-influxdb-raspberry/)
+    - curl -sL https://repos.influxdata.com/influxdb.key | sudo apt-key add -
+    - source /etc/os-release
+    - echo deb https://repos.influxdata.com/debian stretch stable | sudo tee /etc/apt/sources.list.d/influxdb.list
+    - sudo apt-get update && sudo apt-get install influxdb
+    - sudo service influxdb start
+    - sudo nano /etc/influxdb/influxdb.conf
+    - Edit the configuration to enable http on port 8086 with no authentication.
+    - sudo service influxdb restart
+    - sudo pip install influxdb
+    - python3 -m pip install influxdb
+    - influx -precision rfc3339
+    - create database greenhouse
 - Edit config.xml to define your system hardware. The defaults match my hardware.
     
 Recommendations (to make life easier):
@@ -35,6 +53,9 @@ Recommendations (to make life easier):
 See wiki.
 
 ## Changelog
+
+### V0.21
+Added database logging
 
 ### V0.20
 Corrected CSV logging.
