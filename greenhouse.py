@@ -149,9 +149,9 @@ class PropagatorHeaterThread(threading.Thread):
                             propagator_enabled):
                          if (enabled == "Enabled"):
                               if (channel == 1):
-                                   controller_temp = int(thermocouple.get_rj())
+                                   controller_temp = thermocouple.get_rj()
                               try:
-                                   tc = int(thermocouple.get()) + cal - meas
+                                   tc = thermocouple.get() + cal - meas
                                    propagators[channel]["temp"] = tc
                                    if (tc
                                          < propagators[channel]["min_temperature"]):
@@ -792,11 +792,10 @@ def PercentOn(on, off):
           if (on > 1):
                result = 100 # Heater was always on
           else:
-               result = "No measurements"
-               # No measurement of heater on or off!
+               result = 0 # No measurement of heater on or off!
      else:
           # Calculate the percentage of time heater was on
-          result = int(100 * (on / (on + off)))
+          result = 100 * (on / (on + off))
      return (result)
 
 
@@ -879,16 +878,16 @@ class LogThread(threading.Thread):
                iso = time.ctime() # temporary resolving database writing
                session = "greenhouse"
                measurements = {}
-               measurements.update({"Set Temp": propagator_set_temperature})
+               measurements.update({"Set Temp": float(propagator_set_temperature)})
                measurements.update({"Air Temp": controller_temp})
                for channels in propagators:
                     measurements.update({propagators[channels]["name"] + " temp": \
                                          propagators[channels]["temp"]})
                     measurements.update({propagators[channels]["name"] + \
                                          " Heating Active (%)": \
-                                              PercentOn(
+                                              float(PercentOn(
                                               propagators[channels]["log_on"],
-                                              propagators[channels]["log_off"])})
+                                              propagators[channels]["log_off"]))})
                     measurements.update({propagators[channels]["name"] + \
                                          " Min Temp": \
                                          propagators[channels]["min_temperature"]})

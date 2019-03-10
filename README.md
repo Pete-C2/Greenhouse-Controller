@@ -12,7 +12,7 @@ Requires:
 - The [Flask web server](https://www.raspberrypi.org/learning/python-web-server-with-flask/worksheet/). Install command:
   - sudo apt-get install python3-flask
 - A [Raspberry Pi](http://www.raspberrypi.org/) with Raspbian Stretch OS installed (require python3.5 to support Influxdb).
-- Database setup in [Influxdb](https://docs.influxdata.com/influxdb/v1.7/).
+- Database setup in [Influxdb](https://docs.influxdata.com/influxdb/v1.7/). The intention behind logging measurements to a database is to allow graphical monitoring of the greenhouse history. My plan is to use Grafana - see [How to install Grafana+InfluxDB on the Raspberry Pi](https://www.circuits.dk/install-grafana-influxdb-raspberry/) for more information, although at this stage full documentation is not presented here for using Grafana with the Greenhouse Controller.
 - Hardware with [MAX31855 temperature monitors](https://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/MAX31855.html).
 - Hardware to control a heater elements. In my case this was one propagator with a faulty control unit re-wired to drive the relay from the Raspberry Pi and an eight-relay board to switch mains voltages.
 - Hardware with [BH1750 Digital 16-bit ambient light sensor](http://www.mouser.com/ds/2/348/bh1750fvi-e-186247.pdf).
@@ -54,8 +54,11 @@ See wiki.
 
 ## Changelog
 
+### V0.22
+Modifed values so that parameters that are/could be floats are stored into the database with the type float as the type cannot subsequently be changed.
+
 ### V0.21
-Added database logging
+Added database logging.
 
 ### V0.20
 Corrected CSV logging.
