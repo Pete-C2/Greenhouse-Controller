@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.23
+Added initial setting of logging state from config file
+
 ### V0.22
 Modifed values so that parameters that are/could be floats are stored into the database with the type float as the type cannot subsequently be changed.
 

@@ -637,6 +637,10 @@ for child in light_schedule:
 # Read logging
 logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
+if logging.find("ENABLED").text == "Enabled":
+     log_status = "On"
+else:
+     log_status = "Off"
 # Interval in minutes from config file
 
 log_status = "Off"  # Values: Off -> On -> Stop -> Off
