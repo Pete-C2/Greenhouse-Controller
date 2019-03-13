@@ -79,6 +79,7 @@ def print_config():
           print("    From " + str(lighting_schedule[count]["time"]) +
                 ": " + str(lighting_schedule[count]["status"]))
 
+     print("  Logging " + log_status + " at " + log_interval + " second interval")
      print("  Units = " + units)
      print("  Title = " + title)
 
@@ -98,8 +99,8 @@ def send_email(body):
      smtpserver.sendmail(from_address, email_to_address, message)
      smtpserver.quit()
 
-# Heater control code: if the temperature is too cold then turn the heater on
-# (typically using a relay), else turn it off.
+# Propagator heater control code: if the temperature is too cold then turn the
+# heater on (typically using a relay), else turn it off.
 
 
 class PropagatorHeaterThread(threading.Thread):
@@ -245,6 +246,10 @@ class PropagatorHeaterThread(threading.Thread):
           except KeyboardInterrupt:
                GPIO.cleanup()
 
+# Air heater control code: if the temperature is too cold then turn the
+# heater on (typically using a relay), else turn it off.
+
+
 class AirHeaterThread(threading.Thread):
 
      def run(self):
@@ -317,6 +322,10 @@ class AirHeaterThread(threading.Thread):
 
           except KeyboardInterrupt:
                GPIO.cleanup()
+
+# Lighting control code: on a schedule, if the light level is low then turn the
+# lighting on (typically using a relay), else turn it off.
+
 
 class LightingThread(threading.Thread):
 
@@ -417,6 +426,9 @@ class LightingThread(threading.Thread):
           except KeyboardInterrupt:
                GPIO.cleanup()
 
+# Humidity code: record the humidity and air temperature
+
+
 class HumidityThread(threading.Thread):
 
      def run(self):
@@ -486,7 +498,141 @@ class HumidityThread(threading.Thread):
           except KeyboardInterrupt:
                GPIO.cleanup()
 
-app = Flask(__name__)
+# Logging code: write a CSV file with header and then one set of sensor
+# measurements per interval to the CSV file and database
+
+def PercentOn(on, off):
+     if (off == 0):
+          if (on > 1):
+               result = 100 # Heater was always on
+          else:
+               result = 0 # No measurement of heater on or off!
+     else:
+          # Calculate the percentage of time heater was on
+          result = 100 * (on / (on + off))
+     return (result)
+
+
+class LogThread(threading.Thread):
+
+     def run(self):
+          global log_status
+          global propagators
+          global log_off
+          
+          now = datetime.datetime.now()
+
+          # CSV logging initialisation
+          filetime = now.strftime("%Y-%m-%d-%H-%M")
+          filename=dir+"/logging/"+filetime+"_temperature_log.csv"
+          debug_log("Logging started: " + filename)
+          with open(filename, "at") as csvfile:
+               logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
+               row = ["Date-Time"]
+               row.append("Set Temp")
+               row.append("Air Temp")
+               for channels in propagators:
+                    row.append(propagators[channels]["name"])
+                    row.append("Heating Active (%)")
+                    row.append("Min Temp")
+                    row.append("Max Temp")
+               row.append("Light level")
+               for channels in lighting:
+                    row.append(lighting[channels]["name"] + " Light State")
+               row.append("Air Temp 2")
+               row.append("Humidity")
+               row.append("Air Temp 3")
+               logfile.writerow(row)
+
+          # InfluxDB logging initialisation
+          host = "localhost"
+          port = 8086
+          user = "root"
+          password = "root"
+           
+          # The database we created
+          dbname = "greenhouse"
+
+          # Create the InfluxDB object
+          database = InfluxDBClient(host, port, user, password, dbname)
+
+          while log_status == "On":
+               # CSV logging
+               with open(filename, "at") as csvfile:
+                    logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
+                    now = datetime.datetime.now()
+                    row = [now.strftime("%d/%m/%Y %H:%M")]
+                    row.append(propagator_set_temperature)
+                    row.append(controller_temp)
+                    for channels in propagators:
+                         row.append(propagators[channels]["temp"])
+                         row.append(PercentOn(propagators[channels]["log_on"],
+                                              propagators[channels]["log_off"]))
+                         row.append(propagators[channels]["min_temperature"])
+                         row.append(propagators[channels]["max_temperature"])
+                         propagators[channels]["min_temperature"] = \
+                              propagators[channels]["temp"]
+                         propagators[channels]["max_temperature"] = \
+                              propagators[channels]["temp"]
+
+                    row.append(light_level)
+                    for channels in lighting:
+                         row.append(lighting[channels]["light_state"])
+
+                    row.append(air_temp)
+                    row.append(humidity_level)
+                    row.append(heating_air_temp)
+                    
+                    logfile.writerow(row)
+
+               # Database logging
+               
+               iso = time.ctime() # temporary resolving database writing
+               session = "greenhouse"
+               measurements = {}
+               measurements.update({"Set Temp": float(propagator_set_temperature)})
+               measurements.update({"Air Temp": controller_temp})
+               for channels in propagators:
+                    measurements.update({propagators[channels]["name"] + " temp": \
+                                         propagators[channels]["temp"]})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Heating Active (%)": \
+                                              float(PercentOn(
+                                              propagators[channels]["log_on"],
+                                              propagators[channels]["log_off"]))})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Min Temp": \
+                                         propagators[channels]["min_temperature"]})
+                    measurements.update({propagators[channels]["name"] + \
+                                         " Max Temp": \
+                                         propagators[channels]["max_temperature"]})
+               measurements.update({"Light level": light_level})
+               for channels in lighting:
+                    measurements.update({lighting[channels]["name"] + \
+                              " Light State": lighting[channels]["light_state"]})
+               measurements.update({"Air Temp 2": air_temp})
+               measurements.update({"Humidity": humidity_level})
+               measurements.update({"Air Temp 3": float(heating_air_temp)})
+               
+
+               json_body = [
+               {
+                   "measurement": session,
+                   "time": now.strftime("%Y%m%d%H%M"),
+                   "fields": measurements
+               }
+               ]
+
+               # Write JSON to InfluxDB
+               database.write_points(json_body)
+
+               for channels in propagators:
+                    propagators[channels]["log_on"] = 0 # Reset measurements
+                    propagators[channels]["log_off"] = 0
+
+
+               time.sleep(log_interval)
+          log_status = "Off"
 
 # Initialisation
 
@@ -637,13 +783,12 @@ for child in light_schedule:
 # Read logging
 logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
-if logging.find("ENABLED").text == "Enabled":
-     log_status = "On"
-else:
-     log_status = "Off"
 # Interval in minutes from config file
 
-log_status = "Off"  # Values: Off -> On -> Stop -> Off
+if (logging.find("ENABLED").text == "Enabled"):
+     log_status = "On"  # Values: Off -> On -> Stop -> Off
+else:
+     log_status = "Off"
 
 air_log_on = 0 # Number of measurement intervals when air heater is on
 air_log_off = 0 # Number of measurement intervals when air heater is off
@@ -680,8 +825,13 @@ PropagatorHeaterThread().start()
 AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
+if (log_status == "On"):
+     time.sleep(control_interval) # Wait to acquire the first set of measurements
+     LogThread().start()
 
 # Flask web page code
+
+app = Flask(__name__)
 
 @app.route("/")
 def index():
@@ -689,6 +839,8 @@ def index():
      timeString = now.strftime("%H:%M on %d-%m-%Y")
      if log_status == "On":
           logging = "Active"
+     elif log_status == "Stop":
+          logging = "Stopping..."
      else:
           logging = "Inactive"
      templatedata = {
@@ -708,8 +860,6 @@ def log_button():
           if submitted_value == "Log_Start":
                if (log_status == "Off"):
                     log_status = "On"
-                    log_on = 0
-                    log_off = 0
                     LogThread().start()
 
           if submitted_value =="Log_Stop":
@@ -787,139 +937,6 @@ def cancel():
      output = process.communicate()[0]
      print(output)
      return index()
-
-# Logging code: write a CSV file with header and then one set of sensor
-# measurements per interval
-
-def PercentOn(on, off):
-     if (off == 0):
-          if (on > 1):
-               result = 100 # Heater was always on
-          else:
-               result = 0 # No measurement of heater on or off!
-     else:
-          # Calculate the percentage of time heater was on
-          result = 100 * (on / (on + off))
-     return (result)
-
-
-class LogThread(threading.Thread):
-
-     def run(self):
-          global log_status
-          global log_on
-          global log_off
-          
-          now = datetime.datetime.now()
-
-          # CSV logging initialisation
-          filetime = now.strftime("%Y-%m-%d-%H-%M")
-          filename=dir+"/logging/"+filetime+"_temperature_log.csv"
-          debug_log("Logging started: " + filename)
-          with open(filename, "at") as csvfile:
-               logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
-               row = ["Date-Time"]
-               row.append("Set Temp")
-               row.append("Air Temp")
-               for channels in propagators:
-                    row.append(propagators[channels]["name"])
-                    row.append("Heating Active (%)")
-                    row.append("Min Temp")
-                    row.append("Max Temp")
-               row.append("Light level")
-               for channels in lighting:
-                    row.append(lighting[channels]["name"] + " Light State")
-               row.append("Air Temp 2")
-               row.append("Humidity")
-               row.append("Air Temp 3")
-               logfile.writerow(row)
-
-          # InfluxDB logging initialisation
-          host = "localhost"
-          port = 8086
-          user = "root"
-          password = "root"
-           
-          # The database we created
-          dbname = "greenhouse"
-
-          # Create the InfluxDB object
-          database = InfluxDBClient(host, port, user, password, dbname)
-
-          while log_status == "On":
-               # CSV logging
-               with open(filename, "at") as csvfile:
-                    logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
-                    now = datetime.datetime.now()
-                    row = [now.strftime("%d/%m/%Y %H:%M")]
-                    row.append(propagator_set_temperature)
-                    row.append(controller_temp)
-                    for channels in propagators:
-                         row.append(propagators[channels]["temp"])
-                         row.append(PercentOn(propagators[channels]["log_on"],
-                                              propagators[channels]["log_off"]))
-                         row.append(propagators[channels]["min_temperature"])
-                         row.append(propagators[channels]["max_temperature"])
-                         propagators[channels]["log_on"] = 0 # Reset measurements
-                         propagators[channels]["log_off"] = 0
-                         propagators[channels]["min_temperature"] = \
-                              propagators[channels]["temp"]
-                         propagators[channels]["max_temperature"] = \
-                              propagators[channels]["temp"]
-
-                    row.append(light_level)
-                    for channels in lighting:
-                         row.append(lighting[channels]["light_state"])
-
-                    row.append(air_temp)
-                    row.append(humidity_level)
-                    row.append(heating_air_temp)
-                    
-                    logfile.writerow(row)
-
-               # Database logging
-               
-               iso = time.ctime() # temporary resolving database writing
-               session = "greenhouse"
-               measurements = {}
-               measurements.update({"Set Temp": float(propagator_set_temperature)})
-               measurements.update({"Air Temp": controller_temp})
-               for channels in propagators:
-                    measurements.update({propagators[channels]["name"] + " temp": \
-                                         propagators[channels]["temp"]})
-                    measurements.update({propagators[channels]["name"] + \
-                                         " Heating Active (%)": \
-                                              float(PercentOn(
-                                              propagators[channels]["log_on"],
-                                              propagators[channels]["log_off"]))})
-                    measurements.update({propagators[channels]["name"] + \
-                                         " Min Temp": \
-                                         propagators[channels]["min_temperature"]})
-                    measurements.update({propagators[channels]["name"] + \
-                                         " Max Temp": \
-                                         propagators[channels]["max_temperature"]})
-               measurements.update({"Light level": light_level})
-               for channels in lighting:
-                    measurements.update({lighting[channels]["name"] + \
-                              " Light State": lighting[channels]["light_state"]})
-               measurements.update({"Air Temp 2": air_temp})
-               measurements.update({"Humidity": humidity_level})
-               measurements.update({"Air Temp 3": heating_air_temp})
-               
-
-               json_body = [
-               {
-                   "measurement": session,
-                   "time": now.strftime("%Y%m%d%H%M"),
-                   "fields": measurements
-               }
-               ]
-
-               # Write JSON to InfluxDB
-               database.write_points(json_body)
-
-               time.sleep(log_interval)
-          log_status = "Off"
 
 if __name__ == "__main__":
      app.run(debug=False, host="0.0.0.0")

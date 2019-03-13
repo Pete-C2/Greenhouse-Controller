@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.24
+Enabled logging based on config file setting
+
 ### V0.23
 Added initial setting of logging state from config file
 
