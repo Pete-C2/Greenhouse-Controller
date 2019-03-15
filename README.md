@@ -54,6 +54,11 @@ See wiki.
 
 ## Changelog
 
+### V0.26
+Added error checking code for heating air temperature sensor. NOT yet tested for sensore failure as the sensor is soldered into the test board.
+
+Added temporary code to print propagator heater logging values as there may be a calculation error.
+
 ### V0.25
 Added checking for sensor errors before adding data to database
 

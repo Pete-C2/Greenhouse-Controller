@@ -165,7 +165,8 @@ class PropagatorHeaterThread(threading.Thread):
                                    propagators[channel]["sensor_alert"] = False
                               except MAX31855Error as e:
                                    tc = "Error"
-                                   propagators[channel]["temp"] = "Error: " + e.value
+                                   propagators[channel]["temp"] = "Error: " \
+                                                                  + e.value
                                    propagators[channel]["sensor_error"] = True
                                    if (propagators[channel]["error_count"] \
                                             < alert_sensor):
@@ -194,6 +195,9 @@ class PropagatorHeaterThread(threading.Thread):
                                    # avoid overheating)
                                    propagators[channel]["heater_state"] \
                                                         = "Error: Off"
+                                   if (log_status == "On"):
+                                        propagators[channel]["log_off"] = \
+                                             propagators[channel]["log_off"]+1
                                    debug_log("Error: Propagator relay off")
                               else:
                                    if tc < propagator_set_temperature:
@@ -227,6 +231,7 @@ class PropagatorHeaterThread(threading.Thread):
                                    if (propagators[channel]["temp"]
                                              < (alert_propagator_temp - alert_hysteresis)):
                                         propagators[channel]["alert_state"] = "None"
+                                   print ("Channel " + str(channel) + ": On = " + str(propagators[channel]["log_on"]) + "; Off = " + str(propagators[channel]["log_off"]) + " (Heater = " + propagators[channel]["heater_state"] + ")")
                          else:
                               # Propagator is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
@@ -285,29 +290,55 @@ class AirHeaterThread(threading.Thread):
                               # later than the start of the time schedule
 
                     if (air_enabled == "Enabled"):
-                         air_temperature = sensor.get_temperature() \
-                                             + air_calibrate - air_measured
-                         # Add code to detect sensor failure
-                         heating_air_temp = air_temperature
-
+                         try:
+                              air_temperature = sensor.get_temperature() \
+                                                + air_calibrate - air_measured
+                              air_temperature_error_count = 0
+                              air_temperature_sensor_error = False
+                              air_temperature_sensor_alert = False
+                              heating_air_temp = air_temperature
+                         except:
+                              air_temperature = "Error"
+                              heating_air_temp = "Error"
+                              air_temperature_sensor_error = True
+                              # Improve error handling to see what error the
+                              # sensor returns and add to heating_air_temp
+                              if (air_temperature_error_count < alert_sensor):
+                                   air_temperature_error_count = \
+                                             air_temperature_error_count + 1
+                              if ((air_temperature_error_count >= alert_sensor) \
+                                       and \
+                                       (air_temperature_sensor_alert == False)):
+                                   send_email("Air heater sensor failed.")
+                                   air_temperature_sensor_alert = True                                   
+                                             
                          debug_log("Air temperature: " +
                                    "{0:+.1f}".format(air_temperature) +
                                    "\u00B0C")
-                         if air_temperature < air_set_temperature:
-                              # Turn air heater relay on
-                              GPIO.output(air_heating_relay_pin, GPIO.HIGH)
-                              # Turn on relay
-                              air_heater_state = "On"
-                              if (log_status == "On"):
-                                   air_log_on = air_log_on + 1
-                              debug_log("Air heating relay on")
-                         else:
+                         if air_temperature == "Error":
                               GPIO.output(air_heating_relay_pin, GPIO.LOW)
-                              # Turn off relay
+                              # Turn off relay (fault condition -
+                              # avoid overheating)
                               air_heater_state = "Off"
                               if (log_status == "On"):
                                    air_log_off = air_log_off + 1
-                              debug_log("Air heating relay off")
+                              debug_log("Error: Air heating relay off")
+                         else:
+                              if air_temperature < air_set_temperature:
+                                   # Turn air heater relay on
+                                   GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+                                   # Turn on relay
+                                   air_heater_state = "On"
+                                   if (log_status == "On"):
+                                        air_log_on = air_log_on + 1
+                                   debug_log("Air heating relay on")
+                              else:
+                                   GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                                   # Turn off relay
+                                   air_heater_state = "Off"
+                                   if (log_status == "On"):
+                                        air_log_off = air_log_off + 1
+                                   debug_log("Air heating relay off")
                     else:
                          # Air heating disabled
                          GPIO.output(air_heating_relay_pin, GPIO.LOW)
@@ -510,6 +541,7 @@ def PercentOn(on, off):
      else:
           # Calculate the percentage of time heater was on
           result = 100 * (on / (on + off))
+     print("On: " + str(on) + ", Off: " + str(off) + " = " + str(result) + "%")
      return (result)
 
 def IsFloat(s):
@@ -678,6 +710,7 @@ class LogThread(threading.Thread):
                database.write_points(json_body)
 
                for channels in propagators:
+                    print("Reset log measurements " + str(channels))
                     propagators[channels]["log_on"] = 0 # Reset measurements
                     propagators[channels]["log_off"] = 0
 
