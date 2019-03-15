@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.25
+Added checking for sensor errors before adding data to database
+
 ### V0.24
 Enabled logging based on config file setting
 

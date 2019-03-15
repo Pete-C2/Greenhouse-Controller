@@ -79,7 +79,7 @@ def print_config():
           print("    From " + str(lighting_schedule[count]["time"]) +
                 ": " + str(lighting_schedule[count]["status"]))
 
-     print("  Logging " + log_status + " at " + log_interval + " second interval")
+     print("  Logging " + log_status + " at " + str(log_interval) + " second interval")
      print("  Units = " + units)
      print("  Title = " + title)
 
@@ -512,6 +512,21 @@ def PercentOn(on, off):
           result = 100 * (on / (on + off))
      return (result)
 
+def IsFloat(s):
+    try:
+        float(s)
+        return True
+    except:
+        return False
+
+def AddError(e, e_str):
+     # Add error e to existing error string e_str
+     if e_str == "":
+          e_str = str(e)
+     else:
+          e_str = e_str + ". " + str(e)
+     return e_str
+     
 
 class LogThread(threading.Thread):
 
@@ -590,30 +605,66 @@ class LogThread(threading.Thread):
                iso = time.ctime() # temporary resolving database writing
                session = "greenhouse"
                measurements = {}
-               measurements.update({"Set Temp": float(propagator_set_temperature)})
-               measurements.update({"Air Temp": controller_temp})
+               errors = ""
+               if IsFloat(propagator_set_temperature):
+                    measurements.update({"Set Temp": float(propagator_set_temperature)})
+               else:
+                    errors = AddError("Propagator set temp: "
+                                      + str(propagator_set_temperature), errors)
+               if IsFloat(controller_temp):
+                    measurements.update({"Controller Internal Temp": controller_temp})
+               else:
+                    errors = AddError("Controller Temp: " + str(controller_temp),
+                                      errors)
                for channels in propagators:
-                    measurements.update({propagators[channels]["name"] + " temp": \
-                                         propagators[channels]["temp"]})
+                    if IsFloat(propagators[channels]["temp"]):
+                         measurements.update({propagators[channels]["name"]
+                                              + " temp": propagators[channels]["temp"]})
+                    else:
+                         errors = AddError(propagators[channels]["name"] \
+                                  + " temp: " \
+                                  + str(propagators[channels]["temp"]), errors)
                     measurements.update({propagators[channels]["name"] + \
                                          " Heating Active (%)": \
                                               float(PercentOn(
                                               propagators[channels]["log_on"],
                                               propagators[channels]["log_off"]))})
-                    measurements.update({propagators[channels]["name"] + \
+                    # Min/Max may have the same error as temperature measurement
+                    # Just skip the min/max if they are not measurements
+                    if IsFloat(propagators[channels]["min_temperature"]):
+                         measurements.update({propagators[channels]["name"] + \
                                          " Min Temp": \
                                          propagators[channels]["min_temperature"]})
-                    measurements.update({propagators[channels]["name"] + \
+                    if IsFloat(propagators[channels]["max_temperature"]):
+                         measurements.update({propagators[channels]["name"] + \
                                          " Max Temp": \
                                          propagators[channels]["max_temperature"]})
-               measurements.update({"Light level": light_level})
+
+               if IsFloat(light_level):
+                    measurements.update({"Light level": light_level})
+               else:
+                    errors = AddError("Light level: " + str(light_level), errors)
+
                for channels in lighting:
                     measurements.update({lighting[channels]["name"] + \
                               " Light State": lighting[channels]["light_state"]})
-               measurements.update({"Air Temp 2": air_temp})
-               measurements.update({"Humidity": humidity_level})
-               measurements.update({"Air Temp 3": float(heating_air_temp)})
+               if IsFloat(air_temp):
+                    measurements.update({"Air Temp 2": air_temp})
+               else:
+                    errors = AddError("Air Temp 2: " + str(air_temp), errors)
                
+               if IsFloat(humidity_level):
+                    measurements.update({"Humidity": humidity_level})
+               else:
+                    errors = AddError("Humidity: " + str(humidity_level), errors)
+               
+               if IsFloat(heating_air_temp):
+                    measurements.update({"Heating Air Temp": float(heating_air_temp)})
+               else:
+                    errors = AddError("Heating air temp: " + str(heating_air_temp),
+                                      errors)
+
+               measurements.update({"Errors": errors})
 
                json_body = [
                {
@@ -825,13 +876,14 @@ PropagatorHeaterThread().start()
 AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
+
+app = Flask(__name__) # Start webpage
+
 if (log_status == "On"):
      time.sleep(control_interval) # Wait to acquire the first set of measurements
      LogThread().start()
 
 # Flask web page code
-
-app = Flask(__name__)
 
 @app.route("/")
 def index():
