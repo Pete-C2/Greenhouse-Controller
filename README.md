@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.28
+Added calculation of average lighting on time.
+
 ### V0.27
 Added calculation of average air heating on time.
 

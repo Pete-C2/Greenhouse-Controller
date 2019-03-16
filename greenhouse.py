@@ -430,24 +430,36 @@ class LightingThread(threading.Thread):
                                         # Turn on relay
                                         GPIO.output(relay_pin, GPIO.HIGH)
                                         lighting[channel]["light_state"] = "On"
+                                        if (log_status == "On"):
+                                             lighting[channel]["log_on"] = \
+                                               lighting[channel]["log_on"]+1
                                         debug_log("Light relay on")
                                    elif (current_lux > (on_lux + hysteresis)):
                                         status = "Off"
                                         # Turn off relay
                                         GPIO.output(relay_pin, GPIO.LOW)
                                         lighting[channel]["light_state"] = "Off"
+                                        if (log_status == "On"):
+                                             lighting[channel]["log_off"] = \
+                                               lighting[channel]["log_off"]+1
                                         debug_log("Light relay off")
                                    else:
                                         debug_log("Light level within state change hysteresis")
                               else:
                                    # set_status should be Off (but not checked)
                                    GPIO.output(relay_pin, GPIO.LOW)
+                                   if (log_status == "On"):
+                                        lighting[channel]["log_off"] = \
+                                          lighting[channel]["log_off"]+1
                                    lighting[channel]["light_state"] = "Timer Off"
                                    debug_log("Light relay off by time schedule")
                          else:
                               # Lighting is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
                               lighting[channel]["light_state"] = "Disabled - Off"
+                              if (log_status == "On"):
+                                   lighting[channel]["log_off"] = \
+                                     lighting[channel]["log_off"]+1
                               debug_log("Light disabled - relay off")
                          channel = channel + 1
 
@@ -576,7 +588,7 @@ class LogThread(threading.Thread):
                logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                row = ["Date-Time"]
                row.append("Set Temp")
-               row.append("Air Temp")
+               row.append("Controller Temp")
                for channels in propagators:
                     row.append(propagators[channels]["name"])
                     row.append("Heating Active (%)")
@@ -585,9 +597,11 @@ class LogThread(threading.Thread):
                row.append("Light level")
                for channels in lighting:
                     row.append(lighting[channels]["name"] + " Light State")
+                    row.append(lighting[channels]["name"] + " Light Active (%)")
                row.append("Air Temp 2")
                row.append("Humidity")
-               row.append("Air Temp 3")
+               row.append("Air Heating Temp")
+               row.append("Air Heating Active (%)")
                logfile.writerow(row)
 
           # InfluxDB logging initialisation
@@ -624,10 +638,13 @@ class LogThread(threading.Thread):
                     row.append(light_level)
                     for channels in lighting:
                          row.append(lighting[channels]["light_state"])
+                         row.append(PercentOn(lighting[channels]["log_on"],
+                          lighting[channels]["log_off"]))
 
                     row.append(air_temp)
                     row.append(humidity_level)
                     row.append(heating_air_temp)
+                    row.append(PercentOn(air_log_on, air_log_off))
                     
                     logfile.writerow(row)
 
@@ -679,6 +696,11 @@ class LogThread(threading.Thread):
                for channels in lighting:
                     measurements.update({lighting[channels]["name"] + \
                               " Light State": lighting[channels]["light_state"]})
+                    measurements.update({lighting[channels]["name"] + \
+                              " Lighting Active (%)": \
+                              float(PercentOn(lighting[channels]["log_on"],
+                              lighting[channels]["log_off"]))})
+ 
                if IsFloat(air_temp):
                     measurements.update({"Air Temp 2": air_temp})
                else:
@@ -715,6 +737,9 @@ class LogThread(threading.Thread):
                for channels in propagators:
                     propagators[channels]["log_on"] = 0
                     propagators[channels]["log_off"] = 0
+               for channels in lighting:
+                    lighting[channels]["log_on"] = 0
+                    lighting[channels]["log_off"] = 0
                air_log_on = 0
                air_log_off = 0
 
@@ -828,6 +853,8 @@ channel = 1
 lighting = {}
 for child in lighting_sensors:
      lighting[channel] = {"name": child.find("NAME").text,
+                         "log_on": 0, # No. of measurements heater is on
+                         "log_off": 0, # No. of measurements heater is off
                          "light_state": "Undefined"}
      channel = channel + 1
 
