@@ -231,7 +231,6 @@ class PropagatorHeaterThread(threading.Thread):
                                    if (propagators[channel]["temp"]
                                              < (alert_propagator_temp - alert_hysteresis)):
                                         propagators[channel]["alert_state"] = "None"
-                                   print ("Channel " + str(channel) + ": On = " + str(propagators[channel]["log_on"]) + "; Off = " + str(propagators[channel]["log_off"]) + " (Heater = " + propagators[channel]["heater_state"] + ")")
                          else:
                               # Propagator is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
@@ -541,7 +540,6 @@ def PercentOn(on, off):
      else:
           # Calculate the percentage of time heater was on
           result = 100 * (on / (on + off))
-     print("On: " + str(on) + ", Off: " + str(off) + " = " + str(result) + "%")
      return (result)
 
 def IsFloat(s):
@@ -565,7 +563,8 @@ class LogThread(threading.Thread):
      def run(self):
           global log_status
           global propagators
-          global log_off
+          global air_log_on
+          global air_log_off
           
           now = datetime.datetime.now()
 
@@ -693,8 +692,10 @@ class LogThread(threading.Thread):
                if IsFloat(heating_air_temp):
                     measurements.update({"Heating Air Temp": float(heating_air_temp)})
                else:
-                    errors = AddError("Heating air temp: " + str(heating_air_temp),
-                                      errors)
+                    errors = AddError("Heating air temp: " \
+                                      + str(heating_air_temp), errors)
+               measurements.update({"Air Heating Active (%)": \
+                                   float(PercentOn(air_log_on, air_log_off))})
 
                measurements.update({"Errors": errors})
 
@@ -708,11 +709,14 @@ class LogThread(threading.Thread):
 
                # Write JSON to InfluxDB
                database.write_points(json_body)
+               
+               # Reset measurements
 
                for channels in propagators:
-                    print("Reset log measurements " + str(channels))
-                    propagators[channels]["log_on"] = 0 # Reset measurements
+                    propagators[channels]["log_on"] = 0
                     propagators[channels]["log_off"] = 0
+               air_log_on = 0
+               air_log_off = 0
 
 
                time.sleep(log_interval)
@@ -832,7 +836,8 @@ air_temp = 0
 
 heating_air_temp = 0
 air_heater_state = "Undefined"
-
+air_log_on = 0 # Number of measurement intervals when air heater is on
+air_log_off = 0 # Number of measurement intervals when air heater is off
 
 # Read temperature/lux time schedules
 temperature_schedule = {}
@@ -873,9 +878,6 @@ if (logging.find("ENABLED").text == "Enabled"):
      log_status = "On"  # Values: Off -> On -> Stop -> Off
 else:
      log_status = "Off"
-
-air_log_on = 0 # Number of measurement intervals when air heater is on
-air_log_off = 0 # Number of measurement intervals when air heater is off
 
 # Control
 control_interval = 10 # seconds. Interval between control measurements

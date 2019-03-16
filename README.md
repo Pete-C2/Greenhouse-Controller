@@ -54,6 +54,11 @@ See wiki.
 
 ## Changelog
 
+### V0.27
+Added calculation of average air heating on time.
+
+Removed temprary code as there was no calculation error.
+
 ### V0.26
 Added error checking code for heating air temperature sensor. NOT yet tested for sensore failure as the sensor is soldered into the test board.
 
