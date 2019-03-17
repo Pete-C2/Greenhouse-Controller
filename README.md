@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.29
+Added function to self-test hardware implementation as defined by the configuration.
+
 ### V0.28
 Added calculation of average lighting on time.
 

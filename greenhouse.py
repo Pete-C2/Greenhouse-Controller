@@ -79,7 +79,8 @@ def print_config():
           print("    From " + str(lighting_schedule[count]["time"]) +
                 ": " + str(lighting_schedule[count]["status"]))
 
-     print("  Logging " + log_status + " at " + str(log_interval) + " second interval")
+     print("  Logging " + log_status + " at " + str(log_interval)
+           + " second interval")
      print("  Units = " + units)
      print("  Title = " + title)
 
@@ -98,6 +99,121 @@ def send_email(body):
      message = header + body + "\n"
      smtpserver.sendmail(from_address, email_to_address, message)
      smtpserver.quit()
+
+# Test the hardware
+
+def hardware_test():
+     test_wait = 4 # Number of seconds between each state change
+     print("Hardware test.")
+     
+     print(" > Propagators")
+     GPIO.setmode(GPIO.BOARD)
+     for relay_pin in propagator_relay_pins:
+          GPIO.setup(relay_pin, GPIO.OUT)
+          GPIO.output(relay_pin, GPIO.LOW)
+     thermocouples = []
+     for cs_pin in propagator_cs_pins:
+          thermocouples.append(MAX31855(cs_pin, spi_clock_pin,
+                                        spi_data_pin, units,
+                                        GPIO.BOARD))
+     channel = 1
+     for thermocouple, relay_pin, cal, meas, enabled in zip \
+             (thermocouples,
+             propagator_relay_pins,
+             propagator_calibrate,
+             propagator_measured,
+             propagator_enabled):
+          print("     " + str(channel) + ": " + propagators[channel]["name"])
+          controller_temp = thermocouple.get_rj()
+          try:
+               tc = thermocouple.get() + cal - meas
+          except MAX31855Error as e:
+               tc = "Error: " + e.value
+          print("        MAX31855 temperature = " + str(controller_temp)
+                + "\u00B0C")
+          print("        Thermocouple temperature = " + str(tc) + "\u00B0C")
+          print("        Thermocouple calibration = "
+                + '{0:+g}'.format(cal - meas)
+                + "\u00B0C (included in above temperature)")
+          GPIO.output(relay_pin, GPIO.HIGH)
+          print("        Propagator heating relay On")
+          time.sleep(test_wait)
+          GPIO.output(relay_pin, GPIO.LOW)
+          print("        Propagator heating relay Off")
+          time.sleep(test_wait)
+          channel = channel + 1
+
+     print(" > Air heating")
+     GPIO.setup(air_heating_relay_pin, GPIO.OUT)
+     GPIO.output(air_heating_relay_pin, GPIO.LOW)
+     sensor = W1ThermSensor() # Assumes just one sensor available
+     try:
+          air_temperature = sensor.get_temperature() \
+                            + air_calibrate - air_measured
+     except:
+          air_temperature = "Error"
+     print("        Air temperature = " + str(air_temperature)+ "\u00B0C")
+     print("        Air temperature calibration = "
+           + '{0:+g}'.format(air_calibrate - air_measured)
+           + "\u00B0C (included in above temperature)")
+     GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+     print("        Air heating relay On")
+     time.sleep(test_wait)
+     GPIO.output(air_heating_relay_pin, GPIO.LOW)
+     print("        Air heating relay Off")
+     time.sleep(test_wait)
+
+     print(" > Lighting")
+     for relay_pin in lighting_relay_pins:
+          GPIO.setup(relay_pin, GPIO.OUT)
+          GPIO.output(relay_pin, GPIO.LOW)
+     light_sensor = bh1750.BH1750()
+     channel = 1
+     try:
+          current_lux = light_sensor.get_light_mode()
+     except:
+          current_lux = "Error"
+     print("        Current lux = " + str(current_lux))
+     for relay_pin in lighting_relay_pins:
+          print("     " + str(channel) + ": " + lighting[channel]["name"])
+          GPIO.output(relay_pin, GPIO.HIGH)
+          print("        Lighting relay On")
+          time.sleep(test_wait)
+          GPIO.output(relay_pin, GPIO.LOW)
+          print("        Lighting relay Off")
+          time.sleep(test_wait)
+          channel = channel + 1
+
+     print(" > Humidity sensor")
+     airtemp_humidity_sensor = am2320.AM2320()
+     try:
+          airtemp_humidity_sensor.get_data()
+          print("        Air temp: " +
+                str(airtemp_humidity_sensor.temperature) +
+                "\u00B0C")
+          print("        Humidity: " +
+                str(airtemp_humidity_sensor.humidity) + "%RH")
+     except am2320.AM2320Error as e:
+          print("        Humidity sensor error: " + e.value)
+
+     if test is not None:
+          print(" > Unused hardware")
+          for relay_pin in unused_relay_pins:
+               GPIO.setup(relay_pin, GPIO.OUT)
+               GPIO.output(relay_pin, GPIO.LOW)
+          channel = 1
+          for relay_pin, channel_name in zip(unused_relay_pins,
+                                             unused_channel_names):
+               print("     " + str(channel) + ": " + channel_name)
+               GPIO.output(relay_pin, GPIO.HIGH)
+               print("        Unused relay On")
+               time.sleep(test_wait)
+               GPIO.output(relay_pin, GPIO.LOW)
+               print("        Unused relay Off")
+               time.sleep(test_wait)
+               channel = channel + 1
+     GPIO.cleanup()
+
 
 # Propagator heater control code: if the temperature is too cold then turn the
 # heater on (typically using a relay), else turn it off.
@@ -751,6 +867,7 @@ class LogThread(threading.Thread):
 
 debug_logging = "Off"
 display_config = "Off"
+test_hardware = "Disabled"
 
 # Read any command line parameters
 
@@ -761,6 +878,8 @@ for i in range(total):
           debug_logging = "Enabled"
      if (str(sys.argv[i]) == "--display-config"):
           display_config = "Enabled"
+     if (str(sys.argv[i]) == "--test-hardware"):
+          test_hardware = "Enabled"
 
 # Read config from xml file
 
@@ -779,6 +898,7 @@ logging = root.find("LOGGING")
 temps_schedule = root.find("TEMPERATURES")
 air_temps_schedule = root.find("AIR-TEMPERATURES")
 light_schedule = root.find("LIGHTING")
+test = root.find("TEST") # Used for unused hardware that needs testing
 
 # Read hardware configuration
 # Clock
@@ -800,8 +920,8 @@ propagator_enabled = []
 for child in propagator_sensors:
      propagator_cs_pins.append(int(child.find("CSPIN").text))
      propagator_relay_pins.append(int(child.find("RELAY").text))
-     propagator_calibrate.append(int(child.find("CALIBRATE").text))
-     propagator_measured.append(int(child.find("MEASURED").text))
+     propagator_calibrate.append(float(child.find("CALIBRATE").text))
+     propagator_measured.append(float(child.find("MEASURED").text))
      propagator_channel_names.append(child.find("NAME").text)
      propagator_enabled.append(child.find("ENABLED").text)
 
@@ -829,6 +949,14 @@ for child in lighting_sensors:
 # Read display settings configuration
 units = display.find("UNITS").text.lower()
 title = display.find("TITLE").text
+
+# Read unused hardware
+unused_relay_pins = []
+unused_channel_names = []
+if test is not None:
+     for child in test:
+          unused_relay_pins.append(int(child.find("RELAY").text))
+          unused_channel_names.append(child.find("NAME").text)
 
 # Create dictionaries and variables to store measurements
 propagators = {}
@@ -933,6 +1061,10 @@ if (alert_restart == "Enabled"):
 
 if (display_config == "Enabled"):
      print_config()
+
+if (test_hardware == "Enabled"):
+     hardware_test()
+     exit()
 
 PropagatorHeaterThread().start()
 AirHeaterThread().start()
