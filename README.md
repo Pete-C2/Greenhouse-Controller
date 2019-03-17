@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.30
+Defined logging to align to the boundary of the minute interval
+
 ### V0.29
 Added function to self-test hardware implementation as defined by the configuration.
 

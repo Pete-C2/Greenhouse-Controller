@@ -684,8 +684,14 @@ def AddError(e, e_str):
      else:
           e_str = e_str + ". " + str(e)
      return e_str
-     
 
+def WaitForNextLog():
+     now = datetime.datetime.now()
+     # Calculate the number of seconds until the time boundary will be a
+     # round log interval (e.g. on a 10 minute boundary)
+     wait = 60 * (9 - (now.minute % (log_interval/60))) + (60 - now.second)
+     time.sleep(wait)
+    
 class LogThread(threading.Thread):
 
      def run(self):
@@ -731,6 +737,8 @@ class LogThread(threading.Thread):
 
           # Create the InfluxDB object
           database = InfluxDBClient(host, port, user, password, dbname)
+
+          WaitForNextLog()
 
           while log_status == "On":
                # CSV logging
@@ -860,7 +868,7 @@ class LogThread(threading.Thread):
                air_log_off = 0
 
 
-               time.sleep(log_interval)
+               WaitForNextLog()
           log_status = "Off"
 
 # Initialisation
@@ -1056,15 +1064,15 @@ alert_air_temp = int(email_alerts.find("AIR-TEMP").text)
 alert_hysteresis = int(email_alerts.find("HYSTERESIS").text) # How much
                          # temperature must fall before a new alert is generated
 
+if (test_hardware == "Enabled"):
+     hardware_test()
+     exit()
+
 if (alert_restart == "Enabled"):
      send_email("Greenhouse controller restart")
 
 if (display_config == "Enabled"):
      print_config()
-
-if (test_hardware == "Enabled"):
-     hardware_test()
-     exit()
 
 PropagatorHeaterThread().start()
 AirHeaterThread().start()
