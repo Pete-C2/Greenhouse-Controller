@@ -53,7 +53,10 @@ class AM2320:
 		#at the humidity most significant byte, passes through the humidity least
 		#significant and temperature most significant bytes and stops after
 		#reading the temperature least significant byt.
-		os.write(self.fd, b'\x03\x00\x04')
+		try:
+                        os.write(self.fd, b'\x03\x00\x04')
+		except:
+                        raise AM2320Error("No response from sensor")
 
 		#Wait 1ms (min 800us, max 3ms) to allow the sensor to take measurements
 		time.sleep(0.001)

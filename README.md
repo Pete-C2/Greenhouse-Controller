@@ -54,6 +54,15 @@ See wiki.
 
 ## Changelog
 
+### V0.31
+Added exception if humidity sensor is not connected/faulty.
+
+Detection if one-wire temperature sensor is not connected.
+
+Added test for all relays on - maximum power consumption.
+
+New config for the actual hardware build.
+
 ### V0.30
 Defined logging to align to the boundary of the minute interval
 

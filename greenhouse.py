@@ -146,16 +146,23 @@ def hardware_test():
      print(" > Air heating")
      GPIO.setup(air_heating_relay_pin, GPIO.OUT)
      GPIO.output(air_heating_relay_pin, GPIO.LOW)
-     sensor = W1ThermSensor() # Assumes just one sensor available
      try:
-          air_temperature = sensor.get_temperature() \
-                            + air_calibrate - air_measured
+          sensor = W1ThermSensor() # Assumes just one sensor available
+          sensor_detect = "Detected"
      except:
-          air_temperature = "Error"
-     print("        Air temperature = " + str(air_temperature)+ "\u00B0C")
-     print("        Air temperature calibration = "
-           + '{0:+g}'.format(air_calibrate - air_measured)
-           + "\u00B0C (included in above temperature)")
+          sensor_detect = "Detect Error"
+     if sensor_detect == "Detected":
+          try:
+               air_temperature = sensor.get_temperature() \
+                                 + air_calibrate - air_measured
+          except:
+               air_temperature = "Get temperature Error"
+          print("        Air temperature = " + str(air_temperature)+ "\u00B0C")
+          print("        Air temperature calibration = "
+                + '{0:+g}'.format(air_calibrate - air_measured)
+                + "\u00B0C (included in above temperature)")
+     else:
+          print("        Failed to detect sensor")
      GPIO.output(air_heating_relay_pin, GPIO.HIGH)
      print("        Air heating relay On")
      time.sleep(test_wait)
@@ -212,6 +219,29 @@ def hardware_test():
                print("        Unused relay Off")
                time.sleep(test_wait)
                channel = channel + 1
+
+     print(" > All relays")
+     for relay_pin in propagator_relay_pins:
+          GPIO.output(relay_pin, GPIO.HIGH)
+     GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+     for relay_pin in lighting_relay_pins:
+          GPIO.output(relay_pin, GPIO.HIGH)
+     if test is not None:
+          for relay_pin in unused_relay_pins:
+               GPIO.output(relay_pin, GPIO.HIGH)
+     print("        All relays On")
+     time.sleep(test_wait)
+     for relay_pin in propagator_relay_pins:
+          GPIO.output(relay_pin, GPIO.LOW)
+     GPIO.output(air_heating_relay_pin, GPIO.LOW)
+     for relay_pin in lighting_relay_pins:
+          GPIO.output(relay_pin, GPIO.LOW)
+     if test is not None:
+          for relay_pin in unused_relay_pins:
+               GPIO.output(relay_pin, GPIO.LOW)
+     print("        All relays Off")
+     time.sleep(test_wait)
+     
      GPIO.cleanup()
 
 
@@ -380,6 +410,19 @@ class AirHeaterThread(threading.Thread):
           global heating_air_temp
 
           debug_log("Starting air heating thread")
+
+          sensor_detect = "Unknown"
+
+          while sensor_detect != "Detected":
+               try:
+                    sensor = W1ThermSensor() # Assumes just one sensor available
+                    sensor_detect = "Detected"
+               except:
+                    sensor_detect = "Detect Error"
+                    debug_log("No air heating sensor detected")
+                    # *** Add e-mail notification code
+               time.sleep(control_interval)
+
 
           sensor = W1ThermSensor() # Assumes just one sensor available
 
