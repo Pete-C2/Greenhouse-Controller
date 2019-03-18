@@ -728,28 +728,21 @@ class MonitorThread(threading.Thread):
           error_count = 0
           system_alert = False
           system_high_temperature_alert = False
-          high_temperature_alert = 70
+          high_temperature_alert = 45
 
           try:
                while 1: # Monitor the system forever while powered
                     debug_log("")
                     debug_log("Monitoring CPU temperature...    %s" %
                           (time.ctime(time.time())))
-                    #temp = os.popen("vcgencmd measure_temp").readline()
-                    #cpu_temp = (temp.replace("temp=","").replace("'C\n",""))
-                    #debug_log("CPU = "
-                    #               + str(cpu_temp) + "\u00B0C.")
                     try:
                          cpu_temp = float(measure_cpu_temp())
                          error_count = 0
                          system_error = False
                          system_alert = False
-                         if ((cpu_temp >= 70)
+                         if ((cpu_temp >= high_temperature_alert)
                                   and (system_high_temperature_alert == False)):
-                              send_email("CPU temperature " + str(cpu_temp)
-                                         + "\u00B0C exceeded "
-                                         + str(high_temperature_alert)
-                                         + "\u00B0C.")
+                              send_email("CPU temperature exceeded high temperature alert")
                               system_high_temperature_alert = True
                          else:
                               system_high_temperature_alert = False
