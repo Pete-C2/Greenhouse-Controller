@@ -24,6 +24,12 @@ from max31855 import MAX31855, MAX31855Error
 import bh1750
 import am2320
 
+# Read CPU temperature
+
+def measure_cpu_temp():
+     temp = os.popen("vcgencmd measure_temp").readline()
+     return (temp.replace("temp=","").replace("'C\n",""))
+
 # Debug logging
 
 def debug_log(log_string):
@@ -707,6 +713,68 @@ class HumidityThread(threading.Thread):
           except KeyboardInterrupt:
                GPIO.cleanup()
 
+# Monitor control code: monitor the system.
+# Currently only monitors the CPU temperture.
+
+
+class MonitorThread(threading.Thread):
+
+     def run(self):
+          global cpu_temp
+
+          debug_log("Monitor system thread")
+
+          system_error = False
+          error_count = 0
+          system_alert = False
+          system_high_temperature_alert = False
+          high_temperature_alert = 70
+
+          try:
+               while 1: # Monitor the system forever while powered
+                    debug_log("")
+                    debug_log("Monitoring CPU temperature...    %s" %
+                          (time.ctime(time.time())))
+                    #temp = os.popen("vcgencmd measure_temp").readline()
+                    #cpu_temp = (temp.replace("temp=","").replace("'C\n",""))
+                    #debug_log("CPU = "
+                    #               + str(cpu_temp) + "\u00B0C.")
+                    try:
+                         cpu_temp = float(measure_cpu_temp())
+                         error_count = 0
+                         system_error = False
+                         system_alert = False
+                         if ((cpu_temp >= 70)
+                                  and (system_high_temperature_alert == False)):
+                              send_email("CPU temperature " + str(cpu_temp)
+                                         + "\u00B0C exceeded "
+                                         + str(high_temperature_alert)
+                                         + "\u00B0C.")
+                              system_high_temperature_alert = True
+                         else:
+                              system_high_temperature_alert = False
+                         debug_log("CPU Temperature = "
+                                   + str(cpu_temp) + "\u00B0C.")
+                    except:
+                         debug_log("CPC Monitor error")
+                         cpu_temp = "Error"
+                         
+                         system_error = True
+                         if (error_count < alert_sensor):
+                              error_count = error_count + 1
+                         if ((error_count >= alert_sensor)
+                                  and (system_alert == False)):
+                              send_email("CPU monitor failed.")
+                              system_alert = True
+
+                    now = datetime.datetime.now().time()
+
+                    time.sleep(control_interval)
+
+          except KeyboardInterrupt:
+               GPIO.cleanup()
+
+
 # Logging code: write a CSV file with header and then one set of sensor
 # measurements per interval to the CSV file and database
 
@@ -775,11 +843,16 @@ class LogThread(threading.Thread):
                row.append("Humidity")
                row.append("Air Heating Temp")
                row.append("Air Heating Active (%)")
+               row.append("CPU Temp")
                logfile.writerow(row)
 
           # InfluxDB logging initialisation
           host = "localhost"
           port = 8086
+          # Authentication is not enabled. user/password combination is
+          # irrelevant as credentials are ignored and all users have all
+          # privileges. Adding authentication adds complication and requires
+          # secure password storage (otherwise it is irrelevant). 
           user = "root"
           password = "root"
            
@@ -816,6 +889,7 @@ class LogThread(threading.Thread):
                     row.append(humidity_level)
                     row.append(heating_air_temp)
                     row.append(PercentOn(air_log_on, air_log_off))
+                    row.append(cpu_temp)
                     
                     logfile.writerow(row)
 
@@ -890,6 +964,12 @@ class LogThread(threading.Thread):
                measurements.update({"Air Heating Active (%)": \
                                    float(PercentOn(air_log_on, air_log_off))})
 
+               if IsFloat(cpu_temp):
+                    measurements.update({"CPU Temp": float(cpu_temp)})
+               else:
+                    errors = AddError("CPU temp: " \
+                                      + str(cpu_temp), errors)
+
                measurements.update({"Errors": errors})
 
                json_body = [
@@ -927,6 +1007,7 @@ class LogThread(threading.Thread):
 debug_logging = "Off"
 display_config = "Off"
 test_hardware = "Disabled"
+cpu_temp = 0.1 # Dummy value pending first reading
 
 # Read any command line parameters
 
@@ -1129,6 +1210,7 @@ PropagatorHeaterThread().start()
 AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
+MonitorThread().start()
 
 app = Flask(__name__) # Start webpage
 
@@ -1195,12 +1277,12 @@ def temp():
           heating_air = "{:.1f}".format(heating_air_temp)
      except:
           heating_air = heating_air_temp
-          
 
      templatedata = {
                 "title": title,
                 "time": timeString,
                 "controller": controller_temp,
+                "cpu": cpu_temp,
                 "set": propagator_set_temperature,
                 "propagators": propagators,
                 "units": units.upper(),
