@@ -300,11 +300,19 @@ class PropagatorHeaterThread(threading.Thread):
                               try:
                                    tc = thermocouple.get() + cal - meas
                                    propagators[channel]["temp"] = tc
-                                   if (tc
-                                         < propagators[channel]["min_temperature"]):
+                                   if IsFloat(propagators[channel]["min_temperature"]):
+                                        if (tc
+                                              < propagators[channel]["min_temperature"]):
+                                             propagators[channel]["min_temperature"] = tc
+                                   else:
+                                        # Min temperature is not defined
                                         propagators[channel]["min_temperature"] = tc
-                                   if (tc
-                                         > propagators[channel]["max_temperature"]):
+                                   if IsFloat(propagators[channel]["max_temperature"]):
+                                        if (tc
+                                              > propagators[channel]["max_temperature"]):
+                                             propagators[channel]["max_temperature"] = tc
+                                   else:
+                                        # Max temperature is not defined
                                         propagators[channel]["max_temperature"] = tc
                                    propagators[channel]["error_count"] = 0
                                    propagators[channel]["sensor_error"] = False
@@ -754,15 +762,15 @@ class LogThread(threading.Thread):
                row = ["Date-Time"]
                row.append("Set Temp")
                row.append("Controller Temp")
-               for channels in propagators:
-                    row.append(propagators[channels]["name"])
+               for channel in propagators:
+                    row.append(propagators[channel]["name"])
                     row.append("Heating Active (%)")
                     row.append("Min Temp")
                     row.append("Max Temp")
                row.append("Light level")
-               for channels in lighting:
-                    row.append(lighting[channels]["name"] + " Light State")
-                    row.append(lighting[channels]["name"] + " Light Active (%)")
+               for channel in lighting:
+                    row.append(lighting[channel]["name"] + " Light State")
+                    row.append(lighting[channel]["name"] + " Light Active (%)")
                row.append("Air Temp 2")
                row.append("Humidity")
                row.append("Air Heating Temp")
@@ -791,22 +799,18 @@ class LogThread(threading.Thread):
                     row = [now.strftime("%d/%m/%Y %H:%M")]
                     row.append(propagator_set_temperature)
                     row.append(controller_temp)
-                    for channels in propagators:
-                         row.append(propagators[channels]["temp"])
-                         row.append(PercentOn(propagators[channels]["log_on"],
-                                              propagators[channels]["log_off"]))
-                         row.append(propagators[channels]["min_temperature"])
-                         row.append(propagators[channels]["max_temperature"])
-                         propagators[channels]["min_temperature"] = \
-                              propagators[channels]["temp"]
-                         propagators[channels]["max_temperature"] = \
-                              propagators[channels]["temp"]
+                    for channel in propagators:
+                         row.append(propagators[channel]["temp"])
+                         row.append(PercentOn(propagators[channel]["log_on"],
+                                              propagators[channel]["log_off"]))
+                         row.append(propagators[channel]["min_temperature"])
+                         row.append(propagators[channel]["max_temperature"])
 
                     row.append(light_level)
-                    for channels in lighting:
-                         row.append(lighting[channels]["light_state"])
-                         row.append(PercentOn(lighting[channels]["log_on"],
-                          lighting[channels]["log_off"]))
+                    for channel in lighting:
+                         row.append(lighting[channel]["light_state"])
+                         row.append(PercentOn(lighting[channel]["log_on"],
+                                              lighting[channel]["log_off"]))
 
                     row.append(air_temp)
                     row.append(humidity_level)
@@ -831,42 +835,42 @@ class LogThread(threading.Thread):
                else:
                     errors = AddError("Controller Temp: " + str(controller_temp),
                                       errors)
-               for channels in propagators:
-                    if IsFloat(propagators[channels]["temp"]):
-                         measurements.update({propagators[channels]["name"]
-                                              + " temp": propagators[channels]["temp"]})
+               for channel in propagators:
+                    if IsFloat(propagators[channel]["temp"]):
+                         measurements.update({propagators[channel]["name"]
+                                              + " temp": propagators[channel]["temp"]})
                     else:
-                         errors = AddError(propagators[channels]["name"] \
+                         errors = AddError(propagators[channel]["name"] \
                                   + " temp: " \
-                                  + str(propagators[channels]["temp"]), errors)
-                    measurements.update({propagators[channels]["name"] + \
+                                  + str(propagators[channel]["temp"]), errors)
+                    measurements.update({propagators[channel]["name"] + \
                                          " Heating Active (%)": \
                                               float(PercentOn(
-                                              propagators[channels]["log_on"],
-                                              propagators[channels]["log_off"]))})
+                                              propagators[channel]["log_on"],
+                                              propagators[channel]["log_off"]))})
                     # Min/Max may have the same error as temperature measurement
                     # Just skip the min/max if they are not measurements
-                    if IsFloat(propagators[channels]["min_temperature"]):
-                         measurements.update({propagators[channels]["name"] + \
+                    if IsFloat(propagators[channel]["min_temperature"]):
+                         measurements.update({propagators[channel]["name"] + \
                                          " Min Temp": \
-                                         propagators[channels]["min_temperature"]})
-                    if IsFloat(propagators[channels]["max_temperature"]):
-                         measurements.update({propagators[channels]["name"] + \
+                                         propagators[channel]["min_temperature"]})
+                    if IsFloat(propagators[channel]["max_temperature"]):
+                         measurements.update({propagators[channel]["name"] + \
                                          " Max Temp": \
-                                         propagators[channels]["max_temperature"]})
+                                         propagators[channel]["max_temperature"]})
 
                if IsFloat(light_level):
                     measurements.update({"Light level": light_level})
                else:
                     errors = AddError("Light level: " + str(light_level), errors)
 
-               for channels in lighting:
-                    measurements.update({lighting[channels]["name"] + \
-                              " Light State": lighting[channels]["light_state"]})
-                    measurements.update({lighting[channels]["name"] + \
+               for channel in lighting:
+                    measurements.update({lighting[channel]["name"] + \
+                              " Light State": lighting[channel]["light_state"]})
+                    measurements.update({lighting[channel]["name"] + \
                               " Lighting Active (%)": \
-                              float(PercentOn(lighting[channels]["log_on"],
-                              lighting[channels]["log_off"]))})
+                              float(PercentOn(lighting[channel]["log_on"],
+                              lighting[channel]["log_off"]))})
  
                if IsFloat(air_temp):
                     measurements.update({"Air Temp 2": air_temp})
@@ -901,12 +905,16 @@ class LogThread(threading.Thread):
                
                # Reset measurements
 
-               for channels in propagators:
-                    propagators[channels]["log_on"] = 0
-                    propagators[channels]["log_off"] = 0
-               for channels in lighting:
-                    lighting[channels]["log_on"] = 0
-                    lighting[channels]["log_off"] = 0
+               for channel in propagators:
+                    propagators[channel]["log_on"] = 0
+                    propagators[channel]["log_off"] = 0
+                    propagators[channel]["min_temperature"] = \
+                         propagators[channel]["temp"]
+                    propagators[channel]["max_temperature"] = \
+                         propagators[channel]["temp"]
+               for channel in lighting:
+                    lighting[channel]["log_on"] = 0
+                    lighting[channel]["log_off"] = 0
                air_log_on = 0
                air_log_off = 0
 
@@ -1017,8 +1025,8 @@ for child in propagator_sensors:
                              "temp": "",
                              "log_on": 0, # No. of measurements heater is on
                              "log_off": 0, # No. of measurements heater is off
-                             "min_temperature": 100, # greater than min will be
-                             "max_temperature": -100, # less than max will be
+                             "min_temperature": "Undefined",
+                             "max_temperature": "Undefined",
                              "heater_state": "Undefined",
                              "alert_state": "None", # Alert for high temperature
                              "sensor_error": False,

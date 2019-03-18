@@ -54,6 +54,9 @@ See wiki.
 
 ## Changelog
 
+### V0.32
+Modified min/max calculation of thermocouple temperatures to cope with errors
+
 ### V0.31
 Added exception if humidity sensor is not connected/faulty.
 
