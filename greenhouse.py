@@ -14,6 +14,8 @@ import time
 import csv
 import sys
 import smtplib
+from email.mime.text import MIMEText
+
 
 import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
@@ -90,21 +92,6 @@ def print_config():
      print("  Units = " + units)
      print("  Title = " + title)
 
-def send_email(body):
-     debug_log("Email: " + body)
-     smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
-     smtpserver.ehlo()
-     smtpserver.starttls()
-     smtpserver.ehlo()
-     smtpserver.login(email_address, email_password)
-     from_address = email_address
-     subject = "Alert from Greenhouse Controller"
-     header = "To:" + email_to_address + "\n"
-     header = header + "From: Greenhouse Controller <" + from_address + ">\n"
-     header = header + "Subject:" + subject + "\n"
-     message = header + body + "\n"
-     smtpserver.sendmail(from_address, email_to_address, message)
-     smtpserver.quit()
 
 # Test the hardware
 
@@ -338,7 +325,7 @@ class PropagatorHeaterThread(threading.Thread):
                                             >= alert_sensor)
                                             and
                                            ((propagators[channel]["sensor_alert"] == False))):
-                                        send_email("Propagator sensor failed "
+                                        add_email("Propagator sensor failed "
                                                    + propagators[channel]["name"] + ".")
                                         propagators[channel]["sensor_alert"] = True
 
@@ -383,11 +370,11 @@ class PropagatorHeaterThread(threading.Thread):
                                    if (propagators[channel]["temp"]
                                             >= alert_propagator_temp):
                                         if (propagators[channel]["alert_state"] == "None"):
-                                             send_email("Greenhouse high propagator temperature alert - "
+                                             add_email("Greenhouse high propagator temperature alert - "
                                                         + propagators[channel]["name"]
                                                         + ". Temperature = "
                                                         + str(propagators[channel]["temp"])
-                                                        + "degC.")
+                                                        + "\u00B0C.")
                                              debug_log("High temperature alert e-mail sent")
                                              propagators[channel]["alert_state"] = "Alerted"
                                    if (propagators[channel]["temp"]
@@ -483,7 +470,7 @@ class AirHeaterThread(threading.Thread):
                               if ((air_temperature_error_count >= alert_sensor) \
                                        and \
                                        (air_temperature_sensor_alert == False)):
-                                   send_email("Air heater sensor failed.")
+                                   add_email("Air heater sensor failed.")
                                    air_temperature_sensor_alert = True                                   
                                              
                          debug_log("Air temperature: " +
@@ -576,7 +563,7 @@ class LightingThread(threading.Thread):
                               error_count = error_count + 1
                          if ((error_count >= alert_sensor)
                                   and (sensor_alert == False)):
-                              send_email("Light sensor failed.")
+                              add_email("Light sensor failed.")
                               sensor_alert = True
 
                     now = datetime.datetime.now().time()
@@ -682,7 +669,7 @@ class HumidityThread(threading.Thread):
                               error_count = error_count + 1
                          if ((error_count >= alert_sensor)
                                   and (sensor_alert == False)):
-                              send_email("Humidity sensor failed.")
+                              add_email("Humidity sensor failed.")
                               sensor_alert = True
 
                     if (sensor_error == False):
@@ -696,9 +683,9 @@ class HumidityThread(threading.Thread):
                          if (airtemp_humidity_sensor.temperature
                                   >= alert_air_temp):
                               if (alert_state == "None"):
-                                   send_email("Greenhouse high air temperature alert. Temperature = "
+                                   add_email("Greenhouse high air temperature alert. Temperature = "
                                               + str(airtemp_humidity_sensor.temperature)
-                                              + "degC.")
+                                              + "\u00B0C.")
                                    debug_log("High temperature alert e-mail sent")
                                    alert_state = "Alerted"
                          if (airtemp_humidity_sensor.temperature
@@ -730,7 +717,8 @@ class MonitorThread(threading.Thread):
           error_count = 0
           system_alert = False
           system_high_temperature_alert = False
-          high_temperature_alert = 70
+          high_temperature_alert = 40
+          hysteresis_alert = 5
 
           try:
                while 1: # Monitor the system forever while powered
@@ -744,9 +732,11 @@ class MonitorThread(threading.Thread):
                          system_alert = False
                          if ((cpu_temp >= high_temperature_alert)
                                   and (system_high_temperature_alert == False)):
-                              send_email("CPU temperature exceeded high temperature alert")
+                              add_email("CPU temperature exceeded high temperature alert at "
+                                        + str(cpu_temp) + "\u00B0C")
                               system_high_temperature_alert = True
-                         else:
+                         elif cpu_temp < (high_temperature_alert
+                                          - hysteresis_alert):
                               system_high_temperature_alert = False
                          debug_log("CPU Temperature = "
                                    + str(cpu_temp) + "\u00B0C.")
@@ -759,7 +749,7 @@ class MonitorThread(threading.Thread):
                               error_count = error_count + 1
                          if ((error_count >= alert_sensor)
                                   and (system_alert == False)):
-                              send_email("CPU monitor failed.")
+                              add_email("CPU monitor failed.")
                               system_alert = True
 
                     now = datetime.datetime.now().time()
@@ -768,6 +758,53 @@ class MonitorThread(threading.Thread):
 
           except KeyboardInterrupt:
                GPIO.cleanup()
+
+# Email code: maintain a maximum length e-mail queue. Send when possible and
+# recover to continue sending if network connection is lost
+
+
+class EmailThread(threading.Thread):
+
+     def run(self):
+          debug_log("E-mail thread")
+          try:
+               while 1: # Run the e-mail queue system forever while powered
+                    debug_log("")
+                    debug_log("Sending E-mail...    %s" %
+                          (time.ctime(time.time())))
+                    debug_log("E-mail queue length = " + str(len(email_queue)))
+                    if len(email_queue) > 0:
+                         try:
+                              debug_log("Email: " + email_queue[0])
+                              smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
+                              smtpserver.ehlo()
+                              smtpserver.starttls()
+                              smtpserver.ehlo()
+                              smtpserver.login(email_address, email_password)
+                              from_address = email_address
+                              subject = "Alert from Greenhouse Controller"
+                              header = "To:" + email_to_address + "\n"
+                              header = header + "From: Greenhouse Controller <" + from_address + ">\n"
+                              header = header + "Subject:" + subject + "\n"
+                              MIMEmsg = MIMEText(email_queue[0].encode('utf-8'), _charset='utf-8')
+                              message = header + MIMEmsg.as_string() + "\n"
+                              smtpserver.sendmail(from_address, email_to_address, message)
+                              smtpserver.quit()
+                              del email_queue[0]
+                         except:
+                              debug_log("Email failed")
+                    time.sleep(email_interval)
+
+          except KeyboardInterrupt:
+               exit()
+
+def add_email(body):
+     now = datetime.datetime.now()
+     if len(email_queue) == max_emails:
+          email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S")+ " - Maximum e-mail queue length reached - dropping e-mails")
+     elif len(email_queue) < max_emails:
+          email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S - ") + body)
+
 
 
 # Logging code: write a CSV file with header and then one set of sensor
@@ -1184,6 +1221,11 @@ email_password = user_details.find("PASSWORD").text
 
 email_alerts = emailroot.find("ALERTS")
 email_to_address = email_alerts.find("TO").text
+
+email_queue = []
+max_emails = 10
+email_interval = 60 # Send e-mails once per minute
+
 alert_restart = email_alerts.find("RESTART").text
 alert_sensor = int(email_alerts.find("SENSOR-FAIL").text)
 alert_propagator_temp = int(email_alerts.find("PROPAGATOR-TEMP").text)
@@ -1196,16 +1238,18 @@ if (test_hardware == "Enabled"):
      exit()
 
 if (alert_restart == "Enabled"):
-     send_email("Greenhouse controller restart")
+     add_email("Greenhouse controller restart")
 
 if (display_config == "Enabled"):
      print_config()
 
+EmailThread().start()
 PropagatorHeaterThread().start()
 AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
 MonitorThread().start()
+
 
 app = Flask(__name__) # Start webpage
 

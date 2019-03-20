@@ -54,6 +54,14 @@ See wiki.
 
 ## Changelog
 
+### V0.35
+Moved e-mail into a thread, allowing for network outages without throwing an exception and maintaining a queue up to max 10 e-mails.
+
+Added ability of e-mail text to include non alphanumeric codes through MIME encoding.
+
+### V0.34
+Added hysteresis to monitor of CPU core temperature
+
 ### V0.33
 Added monitor of CPU core temperature.
 
