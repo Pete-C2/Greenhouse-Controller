@@ -133,6 +133,8 @@ def hardware_test():
           controller_temp = thermocouple.get_rj()
           try:
                tc = thermocouple.get() + cal - meas
+               if (controller_temp == 0) and  (thermocouple.get() == 0):
+                    print("        ** Possible interface error - all bits read 0")
           except MAX31855Error as e:
                tc = "Error: " + e.value
           print("        MAX31855 temperature = " + str(controller_temp)
@@ -728,7 +730,7 @@ class MonitorThread(threading.Thread):
           error_count = 0
           system_alert = False
           system_high_temperature_alert = False
-          high_temperature_alert = 45
+          high_temperature_alert = 70
 
           try:
                while 1: # Monitor the system forever while powered
