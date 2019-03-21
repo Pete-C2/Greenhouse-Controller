@@ -415,6 +415,9 @@ class AirHeaterThread(threading.Thread):
           debug_log("Starting air heating thread")
 
           sensor_detect = "Unknown"
+          air_temperature_error_count = 0
+          air_temperature_sensor_error = False
+          air_temperature_sensor_alert = False
 
           while sensor_detect != "Detected":
                try:
@@ -423,11 +426,22 @@ class AirHeaterThread(threading.Thread):
                except:
                     sensor_detect = "Detect Error"
                     debug_log("No air heating sensor detected")
-                    # *** Add e-mail notification code
+                    air_temperature = "No sensor"
+                    if (air_temperature_error_count < alert_sensor):
+                         air_temperature_error_count = \
+                                   air_temperature_error_count + 1
+                    if ((air_temperature_error_count >= alert_sensor) \
+                             and \
+                             (air_temperature_sensor_alert == False)):
+                         add_email("No air heating sensor detected.")
+                         air_temperature_sensor_alert = True
                time.sleep(control_interval)
 
-
           sensor = W1ThermSensor() # Assumes just one sensor available
+
+          air_temperature_error_count = 0
+          air_temperature_sensor_error = False
+          air_temperature_sensor_alert = False
 
           GPIO.setmode(GPIO.BOARD)
           GPIO.setup(air_heating_relay_pin, GPIO.OUT)
@@ -458,6 +472,9 @@ class AirHeaterThread(threading.Thread):
                               air_temperature_sensor_error = False
                               air_temperature_sensor_alert = False
                               heating_air_temp = air_temperature
+                              debug_log("Air temperature: " +
+                                        "{0:+.1f}".format(air_temperature) +
+                                        "\u00B0C")
                          except:
                               air_temperature = "Error"
                               heating_air_temp = "Error"
@@ -471,11 +488,10 @@ class AirHeaterThread(threading.Thread):
                                        and \
                                        (air_temperature_sensor_alert == False)):
                                    add_email("Air heater sensor failed.")
-                                   air_temperature_sensor_alert = True                                   
+                                   air_temperature_sensor_alert = True
+                              debug_log("Air temperature: " + str(air_temperature))
+
                                              
-                         debug_log("Air temperature: " +
-                                   "{0:+.1f}".format(air_temperature) +
-                                   "\u00B0C")
                          if air_temperature == "Error":
                               GPIO.output(air_heating_relay_pin, GPIO.LOW)
                               # Turn off relay (fault condition -
@@ -717,7 +733,7 @@ class MonitorThread(threading.Thread):
           error_count = 0
           system_alert = False
           system_high_temperature_alert = False
-          high_temperature_alert = 40
+          high_temperature_alert = 70
           hysteresis_alert = 5
 
           try:

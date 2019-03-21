@@ -54,6 +54,11 @@ See wiki.
 
 ## Changelog
 
+### V0.36
+Added e-mail alert if air temperature sensor is missing on restart.
+
+Corrected debug log of air temperature in the event the sensor fails.
+
 ### V0.35
 Moved e-mail into a thread, allowing for network outages without throwing an exception and maintaining a queue up to max 10 e-mails.
 
