@@ -54,7 +54,7 @@ def print_config():
           print("    Propagator: " + name)
           print("      > Chip Select = " + str(cs_pin))
           print("      > Relay = " + str(relay_pin)) 
-          print("      > Calibration = " + str(cal) + "\u00B0C at " + str(meas)
+          print("      > Calibration = " + str(meas) + "\u00B0C at " + str(cal)
           + "\u00B0C")
           print("      > Status = " + status)
      for count in temperature_schedule:
@@ -63,13 +63,19 @@ def print_config():
 
      print("  Air heating:")
      print("    > Relay = " + str(air_heating_relay_pin))
-     print("    > Calibration = " + str(air_calibrate) + "\u00B0C at " +
-           str(air_measured) + "\u00B0C")
+     print("    > Calibration = " + str(air_measured) + "\u00B0C at " +
+           str(air_calibrate) + "\u00B0C")
      print("      > Status = " + air_enabled)
 
      for count in air_temperature_schedule:
           print("    From " + str(air_temperature_schedule[count]["time"]) +
                 ": " + str(air_temperature_schedule[count]["temp"]) + "\u00B0C")
+
+     print("  Humidity:")
+     print("    > Temperature Calibration = " + str(humidity_temp_measured)
+           + "\u00B0C at " + str(humidity_temp_calibrate) + "\u00B0C")
+     print("    > Humidity Calibration = " + str(humidity_humidity_measured)
+           + "%RH at " + str(humidity_humidity_calibrate) + "%RH")
 
      print("  Lighting:")
      for relay_pin, on_lux, hysteresis, name, status in zip(
@@ -689,29 +695,31 @@ class HumidityThread(threading.Thread):
                               sensor_alert = True
 
                     if (sensor_error == False):
+                         air_temp = airtemp_humidity_sensor.temperature \
+                                    + humidity_temp_calibrate \
+                                    - humidity_temp_measured
+                         humidity_level = airtemp_humidity_sensor.humidity \
+                                    + humidity_humidity_calibrate \
+                                    - humidity_humidity_measured
                          debug_log("Air temp: " +
-                               str(airtemp_humidity_sensor.temperature) +
+                               str(air_temp) +
                                "\u00B0C")
                          debug_log("Humidity: " +
-                               str(airtemp_humidity_sensor.humidity) + "%RH")
-                         air_temp = airtemp_humidity_sensor.temperature
-                         humidity_level = airtemp_humidity_sensor.humidity
-                         if (airtemp_humidity_sensor.temperature
+                               str(humidity_level) + "%RH")
+                         if (air_temp
                                   >= alert_air_temp):
                               if (alert_state == "None"):
                                    add_email("Greenhouse high air temperature alert. Temperature = "
-                                              + str(airtemp_humidity_sensor.temperature)
+                                              + str(air_temp)
                                               + "\u00B0C.")
                                    debug_log("High temperature alert e-mail sent")
                                    alert_state = "Alerted"
-                         if (airtemp_humidity_sensor.temperature
+                         if (air_temp
                                    < (alert_air_temp - alert_hysteresis)):
                               alert_state = "None"
                     else:
                          humidity_level = "Humidity sensor error"
                          air_temp = "Humidity sensor error"
-
-                         pass # Add code to monitor errors and send e-mail alert
 
                     time.sleep(control_interval)
 
@@ -1081,6 +1089,7 @@ hardware = root.find("HARDWARE")
 propagator_sensors = root.find("PROPAGATOR-SENSORS")
 lighting_sensors = root.find("LIGHTING-SENSORS")
 air_sensors = root.find("AIR-SENSORS")
+humidity_sensor = root.find("HUMIDITY-SENSOR")
 display = root.find("DISPLAY")
 logging = root.find("LOGGING")
 temps_schedule = root.find("TEMPERATURES")
@@ -1115,9 +1124,15 @@ for child in propagator_sensors:
 
 for child in air_sensors:
      air_heating_relay_pin = (int(child.find("RELAY").text))
-     air_calibrate = (int(child.find("CALIBRATE").text))
-     air_measured = (int(child.find("MEASURED").text))
+     air_calibrate = (float(child.find("CALIBRATE").text))
+     air_measured = (float(child.find("MEASURED").text))
      air_enabled = (child.find("ENABLED").text)
+
+for child in humidity_sensor:
+     humidity_temp_calibrate = (float(child.find("TEMP-CALIBRATE").text))
+     humidity_temp_measured = (float(child.find("TEMP-MEASURED").text))
+     humidity_humidity_calibrate = (float(child.find("HUMIDITY-CALIBRATE").text))
+     humidity_humidity_measured = (float(child.find("HUMIDITY-MEASURED").text))
 
 # Lighting monitor and control
 lighting_relay_pins = []
