@@ -54,10 +54,15 @@ See wiki.
 
 ## Changelog
 
-### V0.37
-Corrected config display of calibration vs measurement
+### V1.0
+Modified config schedules.
 
-Added calibration for humidity sensor
+Installed in greenhouse.
+
+### V0.37
+Corrected config display of calibration vs measurement.
+
+Added calibration for humidity sensor.
 
 ### V0.36
 Added e-mail alert if air temperature sensor is missing on restart.
