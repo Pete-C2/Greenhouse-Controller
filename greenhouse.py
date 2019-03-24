@@ -258,6 +258,8 @@ class PropagatorHeaterThread(threading.Thread):
           global controller_temp
           global propagator_set_temperature
           MAX_VARIANCE = 0.5 # Maximum permitted change per measurement cycle
+          MAX_ERROR_STATE = 3 # Maximum consecutive error states before heater
+                              # turned off
           
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting propagator heater thread")
@@ -374,15 +376,30 @@ class PropagatorHeaterThread(threading.Thread):
                                         + str(propagators[channel]["max_temperature"]))
 
                               if tc == "Error":
-                                   GPIO.output(relay_pin, GPIO.LOW)
-                                   # Turn off Relay (fault condition -
-                                   # avoid overheating)
-                                   propagators[channel]["heater_state"] \
-                                                        = "Error: Off"
-                                   if (log_status == "On"):
-                                        propagators[channel]["log_off"] = \
-                                             propagators[channel]["log_off"]+1
-                                   debug_log("Error: Propagator relay off")
+                                   if propagators[channel]["error_count"] \
+                                           > MAX_ERROR_STATE:
+                                        GPIO.output(relay_pin, GPIO.LOW)
+                                        # Turn off Relay (fault condition -
+                                        # avoid overheating)
+                                        propagators[channel]["heater_state"] \
+                                                             = "Error: Off"
+                                        if log_status == "On":
+                                             propagators[channel]["log_off"] = \
+                                                  propagators[channel]["log_off"]+1
+                                        debug_log("Error: Propagator relay off")
+                                   else:
+                                        # Maintain heater in current state for
+                                        # a short while (assume the temperature
+                                        # has not changed much)
+                                        debug_log("Error: Propagator relay state maintained")
+                                        if log_status == "On":
+                                             if propagators[channel]["heater_state"] \
+                                                             == "On":
+                                                  propagators[channel]["log_on"] = \
+                                                         propagators[channel]["log_on"]+1
+                                             else:
+                                                  propagators[channel]["log_off"] = \
+                                                         propagators[channel]["log_off"]+1
                               else:
                                    if propagators[channel]["temp"] \
                                            < propagator_set_temperature:

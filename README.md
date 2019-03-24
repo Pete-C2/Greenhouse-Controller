@@ -55,6 +55,10 @@ See wiki.
 
 ## Changelog
 
+### V1.1.0-0.2.0
+Limit error disable of propagator relay to only if more than a defined number of consecutive error states occur. Avoids current condition where the temperature
+can be below the defined level, but due to error conditions the relay turns the heater off and the configured temperature is not acheived.
+
 ### V1.1.0-0.1.0
 Limit maximum change of temperature per measurement cycle. Observed that some channels once deployed occasionally jump (e.g. from 20degC to 0degC) within one 10s
 measurement cycle. It is not generally possible to jump big temperature differences in one measurement cycle, even if the heater is enabled; the exception to this
