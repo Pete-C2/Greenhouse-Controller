@@ -47,6 +47,7 @@ Recommendations (to make life easier):
 - Define a [hostname](http://www.simonthepiman.com/how_to_rename_my_raspberry_pi.php).
 - Create a [fileshare](http://raspberrypihq.com/how-to-share-a-folder-with-a-windows-computer-from-a-raspberry-pi/).
 - Install [VNC](https://www.raspberrypi.org/documentation/remote-access/vnc/) for full headless access.
+- Install [Grafana](https://www.circuits.dk/install-grafana-influxdb-raspberry/) to monitor the performance over time.
 
 ## Use
 
@@ -54,7 +55,15 @@ See wiki.
 
 ## Changelog
 
-### V1.0
+### V1.1.0-0.1.0
+Limit maximum change of temperature per measurement cycle. Observed that some channels once deployed occasionally jump (e.g. from 20degC to 0degC) within one 10s
+measurement cycle. It is not generally possible to jump big temperature differences in one measurement cycle, even if the heater is enabled; the exception to this
+could be adding cold water. The result on a large jump is to (unnecessarily) turn on the heater for one (or a few) measurement cycle(s). This will cause
+unnecessary wear on the relay (reducing the lifetime of the system) and unnecessary energy consumption. By limiting the temperature change, incorrect measurements
+have no/minimal effect (the correct temperature will soon be read) and genuine large jumps will take a few measurement cycles to be established (but short in the
+overall scheme of a greenhouse controller).
+
+### V1.0.0
 Modified config schedules.
 
 Installed in greenhouse.

@@ -6,25 +6,26 @@ Controls the temperature of the propagator using a sensor (typically inserted
 into the soil).
 """
 
+import csv
 import datetime
-import xml.etree.ElementTree as ET
+from email.mime.text import MIMEText
+import math
 import os
+import smtplib
+import sys
 import threading
 import time
-import csv
-import sys
-import smtplib
-from email.mime.text import MIMEText
+import xml.etree.ElementTree as ET
 
 
-import RPi.GPIO as GPIO
 from flask import Flask, render_template, request
-from w1thermsensor import W1ThermSensor
 from influxdb import InfluxDBClient
+import RPi.GPIO as GPIO
+from w1thermsensor import W1ThermSensor
 
-from max31855 import MAX31855, MAX31855Error
-import bh1750
 import am2320
+import bh1750
+from max31855 import MAX31855, MAX31855Error
 
 # Read CPU temperature
 
@@ -256,6 +257,7 @@ class PropagatorHeaterThread(threading.Thread):
           global propagators
           global controller_temp
           global propagator_set_temperature
+          MAX_VARIANCE = 0.5 # Maximum permitted change per measurement cycle
           
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting propagator heater thread")
@@ -300,21 +302,46 @@ class PropagatorHeaterThread(threading.Thread):
                                    controller_temp = thermocouple.get_rj()
                               try:
                                    tc = thermocouple.get() + cal - meas
-                                   propagators[channel]["temp"] = tc
+                                   if propagators[channel]["last_temp"] == "None":
+                                        # No measurement recorded yet so this is the first measurement
+                                        debug_log("Set temperature to first measurement")
+                                        propagators[channel]["temp"] = tc
+                                        propagators[channel]["last_temp"] = tc
+                                   else:
+                                        if abs(tc - propagators[channel]["last_temp"]) \
+                                                <= MAX_VARIANCE:
+                                             # Change in measurement acceptable
+                                             propagators[channel]["temp"] = tc
+                                             propagators[channel]["last_temp"] = tc
+                                        else:
+                                             # Allow recorded temperature to
+                                             # change by the acceptable variance
+                                             # from the last valid temperature
+                                             debug_log("Max variance exceeded: " + str(tc - propagators[channel]["last_temp"]) + "\u00B0C")
+                                             propagators[channel]["temp"] = \
+                                                  propagators[channel]["last_temp"] \
+                                                  + math.copysign(MAX_VARIANCE,\
+                                                  tc - propagators[channel]["last_temp"])
+                                             propagators[channel]["last_temp"] = \
+                                                  propagators[channel]["temp"]
                                    if IsFloat(propagators[channel]["min_temperature"]):
-                                        if (tc
+                                        if (propagators[channel]["temp"]
                                               < propagators[channel]["min_temperature"]):
-                                             propagators[channel]["min_temperature"] = tc
+                                             propagators[channel]["min_temperature"] = \
+                                                  propagators[channel]["temp"]
                                    else:
                                         # Min temperature is not defined
-                                        propagators[channel]["min_temperature"] = tc
+                                        propagators[channel]["min_temperature"] = \
+                                                       propagators[channel]["temp"]
                                    if IsFloat(propagators[channel]["max_temperature"]):
-                                        if (tc
+                                        if (propagators[channel]["temp"]
                                               > propagators[channel]["max_temperature"]):
-                                             propagators[channel]["max_temperature"] = tc
+                                             propagators[channel]["max_temperature"] = \
+                                                  propagators[channel]["temp"]
                                    else:
                                         # Max temperature is not defined
-                                        propagators[channel]["max_temperature"] = tc
+                                        propagators[channel]["max_temperature"] = \
+                                                  propagators[channel]["temp"]
                                    propagators[channel]["error_count"] = 0
                                    propagators[channel]["sensor_error"] = False
                                    propagators[channel]["sensor_alert"] = False
@@ -335,8 +362,10 @@ class PropagatorHeaterThread(threading.Thread):
                                                    + propagators[channel]["name"] + ".")
                                         propagators[channel]["sensor_alert"] = True
 
-                              debug_log("Temperature: " + str(tc) + "\u00B0C"
-                                        + ".  Set Temperature: "
+                              debug_log("Measured Temperature: " + str(tc)
+                                        + "\u00B0C; Recorded Temperature: "
+                                        + str(propagators[channel]["temp"])
+                                        + "\u00B0C.  Set Temperature: "
                                         + str(propagator_set_temperature)
                                         + "\u00B0C")
                               debug_log("Min: "
@@ -355,7 +384,8 @@ class PropagatorHeaterThread(threading.Thread):
                                              propagators[channel]["log_off"]+1
                                    debug_log("Error: Propagator relay off")
                               else:
-                                   if tc < propagator_set_temperature:
+                                   if propagators[channel]["temp"] \
+                                           < propagator_set_temperature:
                                         GPIO.output(relay_pin, GPIO.HIGH)
                                         # Turn on relay
                                         propagators[channel]["heater_state"] \
@@ -1167,6 +1197,7 @@ channel = 1
 for child in propagator_sensors:
      propagators[channel] = {"name": child.find("NAME").text,
                              "temp": "",
+                             "last_temp": "None", # Last valid temperature reading
                              "log_on": 0, # No. of measurements heater is on
                              "log_off": 0, # No. of measurements heater is off
                              "min_temperature": "Undefined",
