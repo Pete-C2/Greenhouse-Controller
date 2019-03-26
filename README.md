@@ -56,6 +56,9 @@ See wiki.
 ## Changelog
 
 ### V1.1.0-0.2.0
+Disabled creation of some errors when hardware is disabled.
+
+### V1.1.0-0.2.0
 Limit error disable of propagator relay to only if more than a defined number of consecutive error states occur. Avoids current condition where the temperature
 can be below the defined level, but due to error conditions the relay turns the heater off and the configured temperature is not acheived.
 

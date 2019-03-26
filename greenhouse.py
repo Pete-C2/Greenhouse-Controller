@@ -299,14 +299,14 @@ class PropagatorHeaterThread(threading.Thread):
                             propagator_calibrate,
                             propagator_measured,
                             propagator_enabled):
+                         if (channel == 1):
+                              controller_temp = thermocouple.get_rj()
                          if (enabled == "Enabled"):
-                              if (channel == 1):
-                                   controller_temp = thermocouple.get_rj()
                               try:
                                    tc = thermocouple.get() + cal - meas
                                    if propagators[channel]["last_temp"] == "None":
                                         # No measurement recorded yet so this is the first measurement
-                                        debug_log("Set temperature to first measurement")
+                                        debug_log(str(channel) + ": Set temperature to first measurement")
                                         propagators[channel]["temp"] = tc
                                         propagators[channel]["last_temp"] = tc
                                    else:
@@ -319,7 +319,7 @@ class PropagatorHeaterThread(threading.Thread):
                                              # Allow recorded temperature to
                                              # change by the acceptable variance
                                              # from the last valid temperature
-                                             debug_log("Max variance exceeded: " + str(tc - propagators[channel]["last_temp"]) + "\u00B0C")
+                                             debug_log(str(channel) + ": Max variance exceeded: " + str(tc - propagators[channel]["last_temp"]) + "\u00B0C")
                                              propagators[channel]["temp"] = \
                                                   propagators[channel]["last_temp"] \
                                                   + math.copysign(MAX_VARIANCE,\
@@ -364,13 +364,13 @@ class PropagatorHeaterThread(threading.Thread):
                                                    + propagators[channel]["name"] + ".")
                                         propagators[channel]["sensor_alert"] = True
 
-                              debug_log("Measured Temperature: " + str(tc)
+                              debug_log(str(channel) + ": Measured Temperature: " + str(tc)
                                         + "\u00B0C; Recorded Temperature: "
                                         + str(propagators[channel]["temp"])
                                         + "\u00B0C.  Set Temperature: "
                                         + str(propagator_set_temperature)
                                         + "\u00B0C")
-                              debug_log("Min: "
+                              debug_log(str(channel) + ": Min: "
                                         + str(propagators[channel]["min_temperature"])
                                         + ", Max: "
                                         + str(propagators[channel]["max_temperature"]))
@@ -386,12 +386,12 @@ class PropagatorHeaterThread(threading.Thread):
                                         if log_status == "On":
                                              propagators[channel]["log_off"] = \
                                                   propagators[channel]["log_off"]+1
-                                        debug_log("Error: Propagator relay off")
+                                        debug_log(str(channel) + ": Error: Propagator relay off")
                                    else:
                                         # Maintain heater in current state for
                                         # a short while (assume the temperature
                                         # has not changed much)
-                                        debug_log("Error: Propagator relay state maintained")
+                                        debug_log(str(channel) + ": Error: Propagator relay state maintained")
                                         if log_status == "On":
                                              if propagators[channel]["heater_state"] \
                                                              == "On":
@@ -410,7 +410,7 @@ class PropagatorHeaterThread(threading.Thread):
                                         if (log_status == "On"):
                                              propagators[channel]["log_on"] = \
                                                propagators[channel]["log_on"]+1
-                                        debug_log("Propagator relay on")
+                                        debug_log(str(channel) + ": Propagator relay on")
                                    else:
                                         GPIO.output(relay_pin, GPIO.LOW)
                                         # Turn off relay
@@ -419,7 +419,7 @@ class PropagatorHeaterThread(threading.Thread):
                                         if (log_status == "On"):
                                              propagators[channel]["log_off"] = \
                                                propagators[channel]["log_off"]+1
-                                        debug_log("Propagator relay off")
+                                        debug_log(str(channel) + ": Propagator relay off")
                                    if (propagators[channel]["temp"]
                                             >= alert_propagator_temp):
                                         if (propagators[channel]["alert_state"] == "None"):
@@ -428,7 +428,7 @@ class PropagatorHeaterThread(threading.Thread):
                                                         + ". Temperature = "
                                                         + str(propagators[channel]["temp"])
                                                         + "\u00B0C.")
-                                             debug_log("High temperature alert e-mail sent")
+                                             debug_log(str(channel) + ": High temperature alert e-mail sent")
                                              propagators[channel]["alert_state"] = "Alerted"
                                    if (propagators[channel]["temp"]
                                              < (alert_propagator_temp - alert_hysteresis)):
@@ -441,7 +441,7 @@ class PropagatorHeaterThread(threading.Thread):
                               if (log_status == "On"):
                                    propagators[channel]["log_off"] = \
                                      propagators[channel]["log_off"] + 1
-                              debug_log("Propagator disabled - Relay off")
+                              debug_log(str(channel) + ": Propagator disabled - Relay off")
 
                          channel = channel + 1
                               
@@ -720,53 +720,54 @@ class HumidityThread(threading.Thread):
 
           try:
                while 1: # Control the humidity forever while powered
-                    debug_log("")
-                    debug_log("Measuring humidity...    %s" %
-                          (time.ctime(time.time())))
+                    if humidity_enabled == "Enabled":
+                         debug_log("")
+                         debug_log("Measuring humidity...    %s" %
+                               (time.ctime(time.time())))
 
-                    now = datetime.datetime.now().time()
+                         now = datetime.datetime.now().time()
 
-                    try:
-                         airtemp_humidity_sensor.get_data()
-                         error_count = 0
-                         sensor_error = False
-                         sensor_alert = False
-                    except am2320.AM2320Error as e:
-                         debug_log("Humidity sensor error: " + e.value)
-                         sensor_error = True
-                         if (error_count < alert_sensor):
-                              error_count = error_count + 1
-                         if ((error_count >= alert_sensor)
-                                  and (sensor_alert == False)):
-                              add_email("Humidity sensor failed.")
-                              sensor_alert = True
+                         try:
+                              airtemp_humidity_sensor.get_data()
+                              error_count = 0
+                              sensor_error = False
+                              sensor_alert = False
+                         except am2320.AM2320Error as e:
+                              debug_log("Humidity sensor error: " + e.value)
+                              sensor_error = True
+                              if (error_count < alert_sensor):
+                                   error_count = error_count + 1
+                              if ((error_count >= alert_sensor)
+                                       and (sensor_alert == False)):
+                                   add_email("Humidity sensor failed.")
+                                   sensor_alert = True
 
-                    if (sensor_error == False):
-                         air_temp = airtemp_humidity_sensor.temperature \
-                                    + humidity_temp_calibrate \
-                                    - humidity_temp_measured
-                         humidity_level = airtemp_humidity_sensor.humidity \
-                                    + humidity_humidity_calibrate \
-                                    - humidity_humidity_measured
-                         debug_log("Air temp: " +
-                               str(air_temp) +
-                               "\u00B0C")
-                         debug_log("Humidity: " +
-                               str(humidity_level) + "%RH")
-                         if (air_temp
-                                  >= alert_air_temp):
-                              if (alert_state == "None"):
-                                   add_email("Greenhouse high air temperature alert. Temperature = "
-                                              + str(air_temp)
-                                              + "\u00B0C.")
-                                   debug_log("High temperature alert e-mail sent")
-                                   alert_state = "Alerted"
-                         if (air_temp
-                                   < (alert_air_temp - alert_hysteresis)):
-                              alert_state = "None"
-                    else:
-                         humidity_level = "Humidity sensor error"
-                         air_temp = "Humidity sensor error"
+                         if (sensor_error == False):
+                              air_temp = airtemp_humidity_sensor.temperature \
+                                         + humidity_temp_calibrate \
+                                         - humidity_temp_measured
+                              humidity_level = airtemp_humidity_sensor.humidity \
+                                         + humidity_humidity_calibrate \
+                                         - humidity_humidity_measured
+                              debug_log("Air temp: " +
+                                    str(air_temp) +
+                                    "\u00B0C")
+                              debug_log("Humidity: " +
+                                    str(humidity_level) + "%RH")
+                              if (air_temp
+                                       >= alert_air_temp):
+                                   if (alert_state == "None"):
+                                        add_email("Greenhouse high air temperature alert. Temperature = "
+                                                   + str(air_temp)
+                                                   + "\u00B0C.")
+                                        debug_log("High temperature alert e-mail sent")
+                                        alert_state = "Alerted"
+                              if (air_temp
+                                        < (alert_air_temp - alert_hysteresis)):
+                                   alert_state = "None"
+                         else:
+                              humidity_level = "Humidity sensor error"
+                              air_temp = "Humidity sensor error"
 
                     time.sleep(control_interval)
 
@@ -912,6 +913,7 @@ def WaitForNextLog():
      # Calculate the number of seconds until the time boundary will be a
      # round log interval (e.g. on a 10 minute boundary)
      wait = 60 * (9 - (now.minute % (log_interval/60))) + (60 - now.second)
+     debug_log("Next log in " + str(wait) + "s")
      time.sleep(wait)
     
 class LogThread(threading.Thread):
@@ -969,6 +971,7 @@ class LogThread(threading.Thread):
 
           while log_status == "On":
                # CSV logging
+               debug_log("Write CSV log...")
                with open(filename, "at") as csvfile:
                     logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
                     now = datetime.datetime.now()
@@ -997,7 +1000,8 @@ class LogThread(threading.Thread):
                     logfile.writerow(row)
 
                # Database logging
-               
+
+               debug_log("Write Database log...")
                iso = time.ctime() # temporary resolving database writing
                session = "greenhouse"
                measurements = {}
@@ -1013,28 +1017,29 @@ class LogThread(threading.Thread):
                     errors = AddError("Controller Temp: " + str(controller_temp),
                                       errors)
                for channel in propagators:
-                    if IsFloat(propagators[channel]["temp"]):
-                         measurements.update({propagators[channel]["name"]
-                                              + " temp": propagators[channel]["temp"]})
-                    else:
-                         errors = AddError(propagators[channel]["name"] \
-                                  + " temp: " \
-                                  + str(propagators[channel]["temp"]), errors)
-                    measurements.update({propagators[channel]["name"] + \
-                                         " Heating Active (%)": \
-                                              float(PercentOn(
-                                              propagators[channel]["log_on"],
-                                              propagators[channel]["log_off"]))})
-                    # Min/Max may have the same error as temperature measurement
-                    # Just skip the min/max if they are not measurements
-                    if IsFloat(propagators[channel]["min_temperature"]):
+                    if propagators[channel]["enabled"] == "Enabled":
+                         if IsFloat(propagators[channel]["temp"]):
+                              measurements.update({propagators[channel]["name"]
+                                                   + " temp": propagators[channel]["temp"]})
+                         else:
+                              errors = AddError(propagators[channel]["name"] \
+                                       + " temp: " \
+                                       + str(propagators[channel]["temp"]), errors)
                          measurements.update({propagators[channel]["name"] + \
-                                         " Min Temp": \
-                                         propagators[channel]["min_temperature"]})
-                    if IsFloat(propagators[channel]["max_temperature"]):
-                         measurements.update({propagators[channel]["name"] + \
-                                         " Max Temp": \
-                                         propagators[channel]["max_temperature"]})
+                                              " Heating Active (%)": \
+                                                   float(PercentOn(
+                                                   propagators[channel]["log_on"],
+                                                   propagators[channel]["log_off"]))})
+                         # Min/Max may have the same error as temperature measurement
+                         # Just skip the min/max if they are not measurements
+                         if IsFloat(propagators[channel]["min_temperature"]):
+                              measurements.update({propagators[channel]["name"] + \
+                                              " Min Temp": \
+                                              propagators[channel]["min_temperature"]})
+                         if IsFloat(propagators[channel]["max_temperature"]):
+                              measurements.update({propagators[channel]["name"] + \
+                                              " Max Temp": \
+                                              propagators[channel]["max_temperature"]})
 
                if IsFloat(light_level):
                     measurements.update({"Light level": light_level})
@@ -1049,22 +1054,24 @@ class LogThread(threading.Thread):
                               float(PercentOn(lighting[channel]["log_on"],
                               lighting[channel]["log_off"]))})
  
-               if IsFloat(air_temp):
-                    measurements.update({"Air Temp 2": air_temp})
-               else:
-                    errors = AddError("Air Temp 2: " + str(air_temp), errors)
-               
-               if IsFloat(humidity_level):
-                    measurements.update({"Humidity": humidity_level})
-               else:
-                    errors = AddError("Humidity: " + str(humidity_level), errors)
+               if humidity_enabled == "Enabled":
+                    if IsFloat(air_temp):
+                         measurements.update({"Air Temp 2": air_temp})
+                    else:
+                         errors = AddError("Air Temp 2: " + str(air_temp), errors)
+                    
+                    if IsFloat(humidity_level):
+                         measurements.update({"Humidity": humidity_level})
+                    else:
+                         errors = AddError("Humidity: " + str(humidity_level), errors)
                
                if IsFloat(heating_air_temp):
                     measurements.update({"Heating Air Temp": float(heating_air_temp)})
-               else:
+               elif air_enabled == "Enabled":
                     errors = AddError("Heating air temp: " \
                                       + str(heating_air_temp), errors)
-               measurements.update({"Air Heating Active (%)": \
+               if air_enabled == "Enabled":
+                    measurements.update({"Air Heating Active (%)": \
                                    float(PercentOn(air_log_on, air_log_off))})
 
                if IsFloat(cpu_temp):
@@ -1101,7 +1108,7 @@ class LogThread(threading.Thread):
                air_log_on = 0
                air_log_off = 0
 
-
+               debug_log("Wait for the next log interval")
                WaitForNextLog()
           log_status = "Off"
 
@@ -1180,6 +1187,7 @@ for child in humidity_sensor:
      humidity_temp_measured = (float(child.find("TEMP-MEASURED").text))
      humidity_humidity_calibrate = (float(child.find("HUMIDITY-CALIBRATE").text))
      humidity_humidity_measured = (float(child.find("HUMIDITY-MEASURED").text))
+     humidity_enabled = child.find("ENABLED").text
 
 # Lighting monitor and control
 lighting_relay_pins = []
@@ -1213,6 +1221,7 @@ propagators = {}
 channel = 1
 for child in propagator_sensors:
      propagators[channel] = {"name": child.find("NAME").text,
+                             "enabled" : child.find("ENABLED").text,
                              "temp": "",
                              "last_temp": "None", # Last valid temperature reading
                              "log_on": 0, # No. of measurements heater is on
