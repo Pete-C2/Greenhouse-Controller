@@ -55,7 +55,12 @@ See wiki.
 
 ## Changelog
 
-### V1.1.0-0.2.0
+### V2.0.0
+Added adjustment of temperature due to interference from lighting.
+
+Turning on of growlights caused a sudden drop in measured temperature and a similar increase when the lights turn off; this is likely due to EMC interference from the lights on the thermocouples. This causes the propagator heating to turn on and overheat the propagator (compared to the set temperature). To avoid this, an optional (defined in the configuration file), setting to measure the offset caused, per propagator, when the lights are on is added.
+
+### V1.1.0-0.3.0
 Disabled creation of some errors when hardware is disabled.
 
 ### V1.1.0-0.2.0

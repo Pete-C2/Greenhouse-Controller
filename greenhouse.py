@@ -304,8 +304,32 @@ class PropagatorHeaterThread(threading.Thread):
                          if (enabled == "Enabled"):
                               try:
                                    tc = thermocouple.get() + cal - meas
+                                   if ((propagators[channel]["lighting_turn_on"] == True) \
+                                       and (lighting_temperature_offset \
+                                            == "Enabled")):
+                                        # The lighting has just come on and
+                                        # offset needs calculating
+                                        if IsFloat(propagators[channel]["no_lights_temp"]):
+                                             propagators[channel]["offset_temp"] \
+                                                  = propagators[channel]["no_lights_temp"] \
+                                                    - tc
+                                        else:
+                                             propagators[channel]["offset_temp"] = 0
+                                             # Cannot calculate an offset if
+                                             # there is no last temp
+                                        propagators[channel]["lighting_turn_on"] \
+                                                                           = False
+                                        debug_log(str(channel) + ": Temp offset caused by lighting = " \
+                                                  + str(propagators[channel]["offset_temp"]))
+                                   if ((lighting_temperature_offset == "Enabled") \
+                                          and (any_lighting == True)):
+                                        # The lighting is on and offset needs
+                                        # calculating
+                                        tc = tc + propagators[channel]["offset_temp"]
+                                        debug_log(str(channel) + ": Added offset caused by lighting")
                                    if propagators[channel]["last_temp"] == "None":
-                                        # No measurement recorded yet so this is the first measurement
+                                        # No measurement recorded yet so this is
+                                        # the first measurement
                                         debug_log(str(channel) + ": Set temperature to first measurement")
                                         propagators[channel]["temp"] = tc
                                         propagators[channel]["last_temp"] = tc
@@ -314,12 +338,15 @@ class PropagatorHeaterThread(threading.Thread):
                                                 <= MAX_VARIANCE:
                                              # Change in measurement acceptable
                                              propagators[channel]["temp"] = tc
-                                             propagators[channel]["last_temp"] = tc
+                                             propagators[channel]["last_temp"] =\
+                                                                           tc
                                         else:
                                              # Allow recorded temperature to
                                              # change by the acceptable variance
                                              # from the last valid temperature
-                                             debug_log(str(channel) + ": Max variance exceeded: " + str(tc - propagators[channel]["last_temp"]) + "\u00B0C")
+                                             debug_log(str(channel) + ": Max variance exceeded: " \
+                                                       + str(tc - propagators[channel]["last_temp"]) \
+                                                       + "\u00B0C")
                                              propagators[channel]["temp"] = \
                                                   propagators[channel]["last_temp"] \
                                                   + math.copysign(MAX_VARIANCE,\
@@ -587,12 +614,19 @@ class AirHeaterThread(threading.Thread):
 # Lighting control code: on a schedule, if the light level is low then turn the
 # lighting on (typically using a relay), else turn it off.
 
+def lighting_turn_on():
+     channel = 1
+     for child in propagator_sensors:
+          propagators[channel]["lighting_turn_on"] = True
+          propagators[channel]["no_lights_temp"] = propagators[channel]["last_temp"]
+          channel = channel + 1
 
 class LightingThread(threading.Thread):
 
      def run(self):
           global lighting
           global light_level
+          global any_lighting
 
           GPIO.setmode(GPIO.BOARD)
           debug_log("Starting lighting thread")
@@ -612,6 +646,7 @@ class LightingThread(threading.Thread):
                     debug_log("Measuring light...    %s" %
                           (time.ctime(time.time())))
                     channel = 1
+                    lights = "Off"
 
                     try:
                          current_lux = light_sensor.get_light_mode()
@@ -658,8 +693,11 @@ class LightingThread(threading.Thread):
                               if (set_status == "On"):
                                    if (current_lux < on_lux):
                                         status = "On"
+                                        lights = "On" # Any lights are on
                                         # Turn on relay
                                         GPIO.output(relay_pin, GPIO.HIGH)
+                                        if lighting[channel]["light_state"] == "Off":
+                                             lighting_turn_on()
                                         lighting[channel]["light_state"] = "On"
                                         if (log_status == "On"):
                                              lighting[channel]["log_on"] = \
@@ -693,6 +731,11 @@ class LightingThread(threading.Thread):
                                      lighting[channel]["log_off"]+1
                               debug_log("Light disabled - relay off")
                          channel = channel + 1
+
+                    if lights == "On":
+                         any_lighting = True
+                    else:
+                         any_lighting = False
 
                     time.sleep(control_interval)
 
@@ -1203,6 +1246,9 @@ for child in lighting_sensors:
      lighting_channel_names.append(child.find("NAME").text)
      lighting_enabled.append(child.find("ENABLED").text)
      lighting_status.append("Off")
+     lighting_temperature_offset = child.find("TEMPERATURE-OFFSET").text
+     # Does the temperature need an offset when the lighting is on?
+any_lighting = False # Set to true when the lighting is on => apply temperature offset
 
 # Read display settings configuration
 units = display.find("UNITS").text.lower()
@@ -1224,6 +1270,9 @@ for child in propagator_sensors:
                              "enabled" : child.find("ENABLED").text,
                              "temp": "",
                              "last_temp": "None", # Last valid temperature reading
+                             "offset_temp" : 0, # Offset caused when lighting unit on
+                             "lighting_turn_on" : False, # Set to true when the lighting turns on
+                             "no_lights_temp" : "None", # last temperature before lights are turned on
                              "log_on": 0, # No. of measurements heater is on
                              "log_off": 0, # No. of measurements heater is off
                              "min_temperature": "Undefined",
