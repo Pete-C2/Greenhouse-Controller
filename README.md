@@ -55,6 +55,11 @@ See wiki.
 
 ## Changelog
 
+### V2.0.1
+Corrected failure to detect lights being turned on.
+
+Added write debug to a file for analysis.
+
 ### V2.0.0
 Added adjustment of temperature due to interference from lighting.
 

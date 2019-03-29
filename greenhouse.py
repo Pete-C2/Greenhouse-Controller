@@ -37,7 +37,11 @@ def measure_cpu_temp():
 
 def debug_log(log_string):
      if (debug_logging == "Enabled"):
-         print(log_string)
+          print(log_string)
+          debug_file = open(debug_filename, "a")
+          debug_file.write(log_string + "\n")
+          debug_file.close()
+          
 
 # Display config
 
@@ -646,7 +650,8 @@ class LightingThread(threading.Thread):
                     debug_log("Measuring light...    %s" %
                           (time.ctime(time.time())))
                     channel = 1
-                    lights = "Off"
+                    lights = "Off" # Assume off initially; will be set to On if
+                                   # any lights are on
 
                     try:
                          current_lux = light_sensor.get_light_mode()
@@ -696,7 +701,7 @@ class LightingThread(threading.Thread):
                                         lights = "On" # Any lights are on
                                         # Turn on relay
                                         GPIO.output(relay_pin, GPIO.HIGH)
-                                        if lighting[channel]["light_state"] == "Off":
+                                        if lighting[channel]["light_state"] != "On":
                                              lighting_turn_on()
                                         lighting[channel]["light_state"] = "On"
                                         if (log_status == "On"):
@@ -1162,6 +1167,9 @@ display_config = "Off"
 test_hardware = "Disabled"
 cpu_temp = 0.1 # Dummy value pending first reading
 
+# Find directory of the program
+dir = os.path.dirname(os.path.abspath(__file__))
+
 # Read any command line parameters
 
 total = len(sys.argv)
@@ -1169,15 +1177,18 @@ cmdargs = str(sys.argv)
 for i in range(total):
      if (str(sys.argv[i]) == "--debug"):
           debug_logging = "Enabled"
+          
+          now = datetime.datetime.now()
+
+          # Debug logging initialisation
+          filetime = now.strftime("%Y-%m-%d-%H-%M")
+          debug_filename = dir+"/logging/"+filetime+"_debug.txt"
      if (str(sys.argv[i]) == "--display-config"):
           display_config = "Enabled"
      if (str(sys.argv[i]) == "--test-hardware"):
           test_hardware = "Enabled"
 
 # Read config from xml file
-
-# Find directory of the program
-dir = os.path.dirname(os.path.abspath(__file__))
 debug_log("Configuration: " + dir+"/config.xml")
 # Get the configuration
 tree = ET.parse(dir+"/config.xml")
