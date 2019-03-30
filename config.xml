@@ -145,6 +145,8 @@
 <LOGGING>
   <INTERVAL>10</INTERVAL>
   <ENABLED>Enabled</ENABLED>
+  <CSV>Disabled</CSV>
+  <DATABASE>Enabled</DATABASE>						  
 </LOGGING>
 
 <TEST>

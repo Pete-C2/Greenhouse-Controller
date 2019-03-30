@@ -55,6 +55,20 @@ See wiki.
 
 ## Changelog
 
+### V3.0.0-0.2.0
+Added delay before temperature offset is calculated as the first measurement showed no error.
+
+Added ability to globally enable or disable e-mail notifications.
+
+Added test code to fake the lighting control for testing.
+
+### V3.0.0-0.1.0
+Added setting for Lighting induced temperature offset to print of configuration.
+
+Add count for number of errors detected on thermocouple per logging period.
+
+Add overall e-mail enable/disable.
+
 ### V2.0.1
 Corrected failure to detect lights being turned on.
 

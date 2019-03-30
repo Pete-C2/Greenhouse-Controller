@@ -97,6 +97,7 @@ def print_config():
      for count in lighting_schedule:
           print("    From " + str(lighting_schedule[count]["time"]) +
                 ": " + str(lighting_schedule[count]["status"]))
+     print("    Lighting induced temperature offset = " + lighting_temperature_offset)
 
      print("  Logging " + log_status + " at " + str(log_interval)
            + " second interval")
@@ -313,18 +314,22 @@ class PropagatorHeaterThread(threading.Thread):
                                             == "Enabled")):
                                         # The lighting has just come on and
                                         # offset needs calculating
-                                        if IsFloat(propagators[channel]["no_lights_temp"]):
-                                             propagators[channel]["offset_temp"] \
-                                                  = propagators[channel]["no_lights_temp"] \
-                                                    - tc
+                                        debug_log(str(channel) + ": LO count = " + str(propagators[channel]["light_on_count"]))
+                                        if propagators[channel]["light_on_count"] == 0:
+                                             if IsFloat(propagators[channel]["no_lights_temp"]):
+                                                  propagators[channel]["offset_temp"] \
+                                                       = propagators[channel]["no_lights_temp"] \
+                                                         - tc
+                                             else:
+                                                  propagators[channel]["offset_temp"] = 0
+                                                  # Cannot calculate an offset if
+                                                  # there is no last temp
+                                             propagators[channel]["lighting_turn_on"] \
+                                                                                = False
+                                             debug_log(str(channel) + ": Temp offset caused by lighting = " \
+                                                       + str(propagators[channel]["offset_temp"]))
                                         else:
-                                             propagators[channel]["offset_temp"] = 0
-                                             # Cannot calculate an offset if
-                                             # there is no last temp
-                                        propagators[channel]["lighting_turn_on"] \
-                                                                           = False
-                                        debug_log(str(channel) + ": Temp offset caused by lighting = " \
-                                                  + str(propagators[channel]["offset_temp"]))
+                                             propagators[channel]["light_on_count"] = propagators[channel]["light_on_count"] - 1
                                    if ((lighting_temperature_offset == "Enabled") \
                                           and (any_lighting == True)):
                                         # The lighting is on and offset needs
@@ -383,6 +388,12 @@ class PropagatorHeaterThread(threading.Thread):
                                    propagators[channel]["temp"] = "Error: " \
                                                                   + e.value
                                    propagators[channel]["sensor_error"] = True
+                                   if (log_status == "On"):
+                                        propagators[channel]["log_error_count"] = \
+                                            propagators[channel]["log_error_count"]+1
+                                        debug_log(str(channel) \
+                                                  + ": Log error count = " \
+                                                  + str(propagators[channel]["log_error_count"]))
                                    if (propagators[channel]["error_count"] \
                                             < alert_sensor):
                                         propagators[channel]["error_count"] = \
@@ -619,10 +630,12 @@ class AirHeaterThread(threading.Thread):
 # lighting on (typically using a relay), else turn it off.
 
 def lighting_turn_on():
+     LIGHT_ON_ASSESSMENT = 5
      channel = 1
      for child in propagator_sensors:
-          propagators[channel]["lighting_turn_on"] = True
           propagators[channel]["no_lights_temp"] = propagators[channel]["last_temp"]
+          propagators[channel]["light_on_count"] = LIGHT_ON_ASSESSMENT # No. of measurements before assessment
+          propagators[channel]["lighting_turn_on"] = True
           channel = channel + 1
 
 class LightingThread(threading.Thread):
@@ -746,6 +759,29 @@ class LightingThread(threading.Thread):
 
           except KeyboardInterrupt:
                GPIO.cleanup()
+
+
+class FakeLightingThread(threading.Thread):
+
+     def run(self):
+          global lighting
+          global light_level
+          global any_lighting
+
+          debug_log("Starting FAKE lighting thread")
+
+          while 1: # Fake forever while powered
+               time.sleep(10)
+               print("Pretend lights turn on")
+               lighting_turn_on()
+               any_lighting = True
+               time.sleep(200)
+               print("Pretend lights turn off")
+               any_lighting = False
+               time.sleep(200)
+
+                    
+
 
 # Humidity code: record the humidity and air temperature
 
@@ -895,7 +931,7 @@ class EmailThread(threading.Thread):
                     debug_log("E-mail queue length = " + str(len(email_queue)))
                     if len(email_queue) > 0:
                          try:
-                              debug_log("Email: " + email_queue[0])
+                              debug_log("E-mail: " + email_queue[0])
                               smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
                               smtpserver.ehlo()
                               smtpserver.starttls()
@@ -919,11 +955,12 @@ class EmailThread(threading.Thread):
                exit()
 
 def add_email(body):
-     now = datetime.datetime.now()
-     if len(email_queue) == max_emails:
-          email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S")+ " - Maximum e-mail queue length reached - dropping e-mails")
-     elif len(email_queue) < max_emails:
-          email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S - ") + body)
+     if email_enabled == "Enabled":
+          now = datetime.datetime.now()
+          if len(email_queue) == max_emails:
+               email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S")+ " - Maximum e-mail queue length reached - dropping e-mails")
+          elif len(email_queue) < max_emails:
+               email_queue.append(now.strftime("%d/%m/%Y %H:%M:%S - ") + body)
 
 
 
@@ -988,6 +1025,7 @@ class LogThread(threading.Thread):
                     row.append("Heating Active (%)")
                     row.append("Min Temp")
                     row.append("Max Temp")
+                    row.append("Error count")
                row.append("Light level")
                for channel in lighting:
                     row.append(lighting[channel]["name"] + " Light State")
@@ -1032,6 +1070,7 @@ class LogThread(threading.Thread):
                                               propagators[channel]["log_off"]))
                          row.append(propagators[channel]["min_temperature"])
                          row.append(propagators[channel]["max_temperature"])
+                         row.append(propagators[channel]["log_error_count"])
 
                     row.append(light_level)
                     for channel in lighting:
@@ -1088,6 +1127,9 @@ class LogThread(threading.Thread):
                               measurements.update({propagators[channel]["name"] + \
                                               " Max Temp": \
                                               propagators[channel]["max_temperature"]})
+                         measurements.update({propagators[channel]["name"] + \
+                                              " Error count": \
+                                               propagators[channel]["log_error_count"]})
 
                if IsFloat(light_level):
                     measurements.update({"Light level": light_level})
@@ -1146,6 +1188,7 @@ class LogThread(threading.Thread):
                for channel in propagators:
                     propagators[channel]["log_on"] = 0
                     propagators[channel]["log_off"] = 0
+                    propagators[channel]["log_error_count"] = 0
                     propagators[channel]["min_temperature"] = \
                          propagators[channel]["temp"]
                     propagators[channel]["max_temperature"] = \
@@ -1284,6 +1327,7 @@ for child in propagator_sensors:
                              "offset_temp" : 0, # Offset caused when lighting unit on
                              "lighting_turn_on" : False, # Set to true when the lighting turns on
                              "no_lights_temp" : "None", # last temperature before lights are turned on
+                             "light_on_count" : 0, # Count down to measure temperature with lights
                              "log_on": 0, # No. of measurements heater is on
                              "log_off": 0, # No. of measurements heater is off
                              "min_temperature": "Undefined",
@@ -1292,6 +1336,7 @@ for child in propagator_sensors:
                              "alert_state": "None", # Alert for high temperature
                              "sensor_error": False,
                              "error_count": 0,
+                             "log_error_count": 0, # Count of errors per logging period
                              "sensor_alert": False} # Alert for sensor failure
                              # Default values pending measurements
      channel = channel + 1
@@ -1374,6 +1419,7 @@ email_queue = []
 max_emails = 10
 email_interval = 60 # Send e-mails once per minute
 
+email_enabled = email_alerts.find("ENABLED").text
 alert_restart = email_alerts.find("RESTART").text
 alert_sensor = int(email_alerts.find("SENSOR-FAIL").text)
 alert_propagator_temp = int(email_alerts.find("PROPAGATOR-TEMP").text)
@@ -1397,7 +1443,7 @@ AirHeaterThread().start()
 LightingThread().start()
 HumidityThread().start()
 MonitorThread().start()
-
+#FakeLightingThread().start()
 
 app = Flask(__name__) # Start webpage
 
