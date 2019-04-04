@@ -55,6 +55,11 @@ See wiki.
 
 ## Changelog
 
+### V3.0.0-0.3.0
+Added count of relay activations.
+
+Added command line option for fake lighting.
+
 ### V3.0.0-0.2.0
 Added delay before temperature offset is calculated as the first measurement showed no error.
 

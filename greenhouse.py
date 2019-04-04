@@ -309,6 +309,7 @@ class PropagatorHeaterThread(threading.Thread):
                          if (enabled == "Enabled"):
                               try:
                                    tc = thermocouple.get() + cal - meas
+                                   debug_log(str(channel) + ": Raw measured (calibrated) temperature = " + str(tc))
                                    if ((propagators[channel]["lighting_turn_on"] == True) \
                                        and (lighting_temperature_offset \
                                             == "Enabled")):
@@ -423,6 +424,18 @@ class PropagatorHeaterThread(threading.Thread):
                                         GPIO.output(relay_pin, GPIO.LOW)
                                         # Turn off Relay (fault condition -
                                         # avoid overheating)
+                                        if propagators[channel]["heater_state"] \
+                                                             == "On":
+                                             propagators[channel]["relay_activation"] =\
+                                                       propagators[channel]["relay_activation"] + 1
+                                             if propagators[channel]["relay_count"] == 0:
+                                                  propagators[channel]["consecutive_change"] =\
+                                                            propagators[channel]["consecutive_change"] + 1
+                                             propagators[channel]["relay_count"] = 0
+                                        else:
+                                             propagators[channel]["relay_count"] =\
+                                                       propagators[channel]["relay_count"] + 1
+                                        debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"])+ "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                         propagators[channel]["heater_state"] \
                                                              = "Error: Off"
                                         if log_status == "On":
@@ -447,6 +460,18 @@ class PropagatorHeaterThread(threading.Thread):
                                            < propagator_set_temperature:
                                         GPIO.output(relay_pin, GPIO.HIGH)
                                         # Turn on relay
+                                        if propagators[channel]["heater_state"] \
+                                                             != "On":
+                                             propagators[channel]["relay_activation"] =\
+                                                       propagators[channel]["relay_activation"] + 1
+                                             if propagators[channel]["relay_count"] == 0:
+                                                  propagators[channel]["consecutive_change"] =\
+                                                            propagators[channel]["consecutive_change"] + 1
+                                             propagators[channel]["relay_count"] = 0
+                                        else:
+                                             propagators[channel]["relay_count"] =\
+                                                       propagators[channel]["relay_count"] + 1
+                                        debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                         propagators[channel]["heater_state"] \
                                                              = "On"
                                         if (log_status == "On"):
@@ -456,6 +481,18 @@ class PropagatorHeaterThread(threading.Thread):
                                    else:
                                         GPIO.output(relay_pin, GPIO.LOW)
                                         # Turn off relay
+                                        if propagators[channel]["heater_state"] \
+                                                             == "On":
+                                             propagators[channel]["relay_activation"] =\
+                                                       propagators[channel]["relay_activation"] + 1
+                                             if propagators[channel]["relay_count"] == 0:
+                                                  propagators[channel]["consecutive_change"] =\
+                                                            propagators[channel]["consecutive_change"] + 1
+                                             propagators[channel]["relay_count"] = 0
+                                        else:
+                                             propagators[channel]["relay_count"] =\
+                                                       propagators[channel]["relay_count"] + 1
+                                        debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                         propagators[channel]["heater_state"] \
                                                              = "Off"
                                         if (log_status == "On"):
@@ -479,6 +516,18 @@ class PropagatorHeaterThread(threading.Thread):
                               # Propagator is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
                               # Turn off relay
+                              if propagators[channel]["heater_state"] \
+                                                   == "On":
+                                   propagators[channel]["relay_activation"] =\
+                                             propagators[channel]["relay_activation"] + 1
+                                   if propagators[channel]["relay_count"] == 0:
+                                        propagators[channel]["consecutive_change"] =\
+                                                  propagators[channel]["consecutive_change"] + 1
+                                   propagators[channel]["relay_count"] = 0
+                              else:
+                                   propagators[channel]["relay_count"] =\
+                                             propagators[channel]["relay_count"] + 1
+                              debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                               propagators[channel]["heater_state"] = "Off"
                               if (log_status == "On"):
                                    propagators[channel]["log_off"] = \
@@ -506,6 +555,9 @@ class AirHeaterThread(threading.Thread):
           global air_log_off
           global air_set_temperature
           global heating_air_temp
+          global air_relay_activation
+          global air_relay_count
+          global air_consecutive_change 
 
           debug_log("Starting air heating thread")
 
@@ -589,6 +641,16 @@ class AirHeaterThread(threading.Thread):
                                              
                          if air_temperature == "Error":
                               GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                              if air_heater_state == "On":
+                                   air_relay_activation  = \
+                                             air_relay_activation + 1
+                                   if air_relay_count == 0:
+                                        air_consecutive_change  =\
+                                                  air_consecutive_change + 1
+                                   air_relay_count = 0
+                              else:
+                                   air_relay_count = air_relay_count + 1
+                              debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                               # Turn off relay (fault condition -
                               # avoid overheating)
                               air_heater_state = "Off"
@@ -600,6 +662,16 @@ class AirHeaterThread(threading.Thread):
                                    # Turn air heater relay on
                                    GPIO.output(air_heating_relay_pin, GPIO.HIGH)
                                    # Turn on relay
+                                   if air_heater_state != "On":
+                                        air_relay_activation  = \
+                                                  air_relay_activation + 1
+                                        if air_relay_count == 0:
+                                             air_consecutive_change  =\
+                                                       air_consecutive_change + 1
+                                        air_relay_count = 0
+                                   else:
+                                        air_relay_count = air_relay_count + 1
+                                   debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                                    air_heater_state = "On"
                                    if (log_status == "On"):
                                         air_log_on = air_log_on + 1
@@ -607,6 +679,16 @@ class AirHeaterThread(threading.Thread):
                               else:
                                    GPIO.output(air_heating_relay_pin, GPIO.LOW)
                                    # Turn off relay
+                                   if air_heater_state == "On":
+                                        air_relay_activation  = \
+                                                  air_relay_activation + 1
+                                        if air_relay_count == 0:
+                                             air_consecutive_change  =\
+                                                       air_consecutive_change + 1
+                                        air_relay_count = 0
+                                   else:
+                                        air_relay_count = air_relay_count + 1
+                                   debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                                    air_heater_state = "Off"
                                    if (log_status == "On"):
                                         air_log_off = air_log_off + 1
@@ -615,6 +697,16 @@ class AirHeaterThread(threading.Thread):
                          # Air heating disabled
                          GPIO.output(air_heating_relay_pin, GPIO.LOW)
                          # Turn off relay
+                         if air_heater_state == "On":
+                              air_relay_activation  = \
+                                        air_relay_activation + 1
+                              if air_relay_count == 0:
+                                   air_consecutive_change  =\
+                                             air_consecutive_change + 1
+                              air_relay_count = 0
+                         else:
+                              air_relay_count = air_relay_count + 1
+                         debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                          air_heater_state = "Disabled - Off"
                          heating_air_temp = "Not measured"
                          if (log_status == "On"):
@@ -716,6 +808,18 @@ class LightingThread(threading.Thread):
                                         GPIO.output(relay_pin, GPIO.HIGH)
                                         if lighting[channel]["light_state"] != "On":
                                              lighting_turn_on()
+                                        if lighting[channel]["light_state"] \
+                                                             != "On":
+                                             lighting[channel]["relay_activation"] =\
+                                                       lighting[channel]["relay_activation"] + 1
+                                             if lighting[channel]["relay_count"] == 0:
+                                                  lighting[channel]["consecutive_change"] =\
+                                                            lighting[channel]["consecutive_change"] + 1
+                                             lighting[channel]["relay_count"] = 0
+                                        else:
+                                             lighting[channel]["relay_count"] =\
+                                                       lighting[channel]["relay_count"] + 1
+                                        debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                         lighting[channel]["light_state"] = "On"
                                         if (log_status == "On"):
                                              lighting[channel]["log_on"] = \
@@ -725,6 +829,18 @@ class LightingThread(threading.Thread):
                                         status = "Off"
                                         # Turn off relay
                                         GPIO.output(relay_pin, GPIO.LOW)
+                                        if lighting[channel]["light_state"] \
+                                                             == "On":
+                                             lighting[channel]["relay_activation"] =\
+                                                       lighting[channel]["relay_activation"] + 1
+                                             if lighting[channel]["relay_count"] == 0:
+                                                  lighting[channel]["consecutive_change"] =\
+                                                            lighting[channel]["consecutive_change"] + 1
+                                             lighting[channel]["relay_count"] = 0
+                                        else:
+                                             lighting[channel]["relay_count"] =\
+                                                       lighting[channel]["relay_count"] + 1
+                                        debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                         lighting[channel]["light_state"] = "Off"
                                         if (log_status == "On"):
                                              lighting[channel]["log_off"] = \
@@ -735,6 +851,18 @@ class LightingThread(threading.Thread):
                               else:
                                    # set_status should be Off (but not checked)
                                    GPIO.output(relay_pin, GPIO.LOW)
+                                   if lighting[channel]["light_state"] \
+                                                        == "On":
+                                        lighting[channel]["relay_activation"] =\
+                                                  lighting[channel]["relay_activation"] + 1
+                                        if lighting[channel]["relay_count"] == 0:
+                                             lighting[channel]["consecutive_change"] =\
+                                                       lighting[channel]["consecutive_change"] + 1
+                                        lighting[channel]["relay_count"] = 0
+                                   else:
+                                        lighting[channel]["relay_count"] =\
+                                                  lighting[channel]["relay_count"] + 1
+                                   debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                    if (log_status == "On"):
                                         lighting[channel]["log_off"] = \
                                           lighting[channel]["log_off"]+1
@@ -743,6 +871,18 @@ class LightingThread(threading.Thread):
                          else:
                               # Lighting is disabled
                               GPIO.output(relay_pin, GPIO.LOW)
+                              if lighting[channel]["light_state"] \
+                                                   == "On":
+                                   lighting[channel]["relay_activation"] =\
+                                             lighting[channel]["relay_activation"] + 1
+                                   if lighting[channel]["relay_count"] == 0:
+                                        lighting[channel]["consecutive_change"] =\
+                                                  lighting[channel]["consecutive_change"] + 1
+                                   lighting[channel]["relay_count"] = 0
+                              else:
+                                   lighting[channel]["relay_count"] =\
+                                             lighting[channel]["relay_count"] + 1
+                              debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                               lighting[channel]["light_state"] = "Disabled - Off"
                               if (log_status == "On"):
                                    lighting[channel]["log_off"] = \
@@ -1006,8 +1146,10 @@ class LogThread(threading.Thread):
      def run(self):
           global log_status
           global propagators
+          global lighting
           global air_log_on
           global air_log_off
+          global air_consecutive_change 
           
           now = datetime.datetime.now()
 
@@ -1026,14 +1168,20 @@ class LogThread(threading.Thread):
                     row.append("Min Temp")
                     row.append("Max Temp")
                     row.append("Error count")
+                    row.append("Relay Activations")
+                    row.append("Consecutive Change")
                row.append("Light level")
                for channel in lighting:
                     row.append(lighting[channel]["name"] + " Light State")
                     row.append(lighting[channel]["name"] + " Light Active (%)")
+                    row.append(lighting[channel]["name"] + " Relay Activations")
+                    row.append(lighting[channel]["name"] + " Consecutive Change")
                row.append("Air Temp 2")
                row.append("Humidity")
                row.append("Air Heating Temp")
                row.append("Air Heating Active (%)")
+               row.append("Air heating Relay Activations")
+               row.append("Air heating Consecutive Change")
                row.append("CPU Temp")
                logfile.writerow(row)
 
@@ -1071,17 +1219,23 @@ class LogThread(threading.Thread):
                          row.append(propagators[channel]["min_temperature"])
                          row.append(propagators[channel]["max_temperature"])
                          row.append(propagators[channel]["log_error_count"])
+                         row.append(propagators[channel]["relay_activation"])
+                         row.append(propagators[channel]["consecutive_change"])
 
                     row.append(light_level)
                     for channel in lighting:
                          row.append(lighting[channel]["light_state"])
                          row.append(PercentOn(lighting[channel]["log_on"],
                                               lighting[channel]["log_off"]))
+                         row.append(lighting[channel]["relay_activation"])
+                         row.append(lighting[channel]["consecutive_change"])
 
                     row.append(air_temp)
                     row.append(humidity_level)
                     row.append(heating_air_temp)
                     row.append(PercentOn(air_log_on, air_log_off))
+                    row.append(air_relay_activation)
+                    row.append(air_consecutive_change)
                     row.append(cpu_temp)
                     
                     logfile.writerow(row)
@@ -1130,6 +1284,12 @@ class LogThread(threading.Thread):
                          measurements.update({propagators[channel]["name"] + \
                                               " Error count": \
                                                propagators[channel]["log_error_count"]})
+                         measurements.update({propagators[channel]["name"] + \
+                                              " Relay Activations": \
+                                               propagators[channel]["relay_activation"]})
+                         measurements.update({propagators[channel]["name"] + \
+                                              " Consecutive Changes": \
+                                               propagators[channel]["consecutive_change"]})
 
                if IsFloat(light_level):
                     measurements.update({"Light level": light_level})
@@ -1143,6 +1303,10 @@ class LogThread(threading.Thread):
                               " Lighting Active (%)": \
                               float(PercentOn(lighting[channel]["log_on"],
                               lighting[channel]["log_off"]))})
+                    measurements.update({lighting[channel]["name"] + \
+                              " Relay Activations": lighting[channel]["relay_activation"]})
+                    measurements.update({lighting[channel]["name"] + \
+                              " Consecutive Changes": lighting[channel]["consecutive_change"]})
  
                if humidity_enabled == "Enabled":
                     if IsFloat(air_temp):
@@ -1163,6 +1327,10 @@ class LogThread(threading.Thread):
                if air_enabled == "Enabled":
                     measurements.update({"Air Heating Active (%)": \
                                    float(PercentOn(air_log_on, air_log_off))})
+               measurements.update({"Air Relay Activations": \
+                                   air_relay_activation})
+               measurements.update({"Air Relay Consecutive Changes": \
+                                   air_consecutive_change})
 
                if IsFloat(cpu_temp):
                     measurements.update({"CPU Temp": float(cpu_temp)})
@@ -1193,11 +1361,14 @@ class LogThread(threading.Thread):
                          propagators[channel]["temp"]
                     propagators[channel]["max_temperature"] = \
                          propagators[channel]["temp"]
+                    propagators[channel]["consecutive_change"] = 0
                for channel in lighting:
                     lighting[channel]["log_on"] = 0
                     lighting[channel]["log_off"] = 0
+                    lighting[channel]["consecutive_change"] = 0
                air_log_on = 0
                air_log_off = 0
+               air_consecutive_change = 0
 
                debug_log("Wait for the next log interval")
                WaitForNextLog()
@@ -1208,6 +1379,7 @@ class LogThread(threading.Thread):
 debug_logging = "Off"
 display_config = "Off"
 test_hardware = "Disabled"
+fake_lighting = "Disabled"
 cpu_temp = 0.1 # Dummy value pending first reading
 
 # Find directory of the program
@@ -1230,6 +1402,8 @@ for i in range(total):
           display_config = "Enabled"
      if (str(sys.argv[i]) == "--test-hardware"):
           test_hardware = "Enabled"
+     if (str(sys.argv[i]) == "--fake-lighting"):
+          fake_lighting = "Enabled"
 
 # Read config from xml file
 debug_log("Configuration: " + dir+"/config.xml")
@@ -1333,6 +1507,9 @@ for child in propagator_sensors:
                              "min_temperature": "Undefined",
                              "max_temperature": "Undefined",
                              "heater_state": "Undefined",
+                             "relay_activation": 0, 
+                             "relay_count": 0, # Count since last relay change
+                             "consecutive_change": 0, # No. of consecutive relay changes
                              "alert_state": "None", # Alert for high temperature
                              "sensor_error": False,
                              "error_count": 0,
@@ -1348,7 +1525,10 @@ for child in lighting_sensors:
      lighting[channel] = {"name": child.find("NAME").text,
                          "log_on": 0, # No. of measurements heater is on
                          "log_off": 0, # No. of measurements heater is off
-                         "light_state": "Undefined"}
+                         "light_state": "Undefined",
+                         "relay_activation": 0, 
+                         "relay_count": 0, # Count since last relay change
+                         "consecutive_change": 0} # No. of consecutive relay changes
      channel = channel + 1
 
 humidity_level = 0
@@ -1356,6 +1536,10 @@ air_temp = 0
 
 heating_air_temp = 0
 air_heater_state = "Undefined"
+air_relay_activation = 0
+air_relay_count = 0 # Count since last relay change
+air_consecutive_change = 0 # No. of consecutive relay changes
+
 air_log_on = 0 # Number of measurement intervals when air heater is on
 air_log_off = 0 # Number of measurement intervals when air heater is off
 
@@ -1440,10 +1624,12 @@ if (display_config == "Enabled"):
 EmailThread().start()
 PropagatorHeaterThread().start()
 AirHeaterThread().start()
-LightingThread().start()
 HumidityThread().start()
 MonitorThread().start()
-#FakeLightingThread().start()
+if fake_lighting == "Enabled":
+     FakeLightingThread().start()
+else:
+     LightingThread().start()
 
 app = Flask(__name__) # Start webpage
 
