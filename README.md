@@ -55,6 +55,11 @@ See wiki.
 
 ## Changelog
 
+### V3.0.0-0.4.0
+Restricted relay activations if there has been a recent activation.
+
+Added write of activations to configuration XML file.
+
 ### V3.0.0-0.3.0
 Added count of relay activations.
 
