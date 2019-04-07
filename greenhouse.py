@@ -101,6 +101,9 @@ def print_config():
 
      print("  Logging " + log_status + " at " + str(log_interval)
            + " second interval")
+     print("    Log CSV = " + log_CSV)
+     print("    Log Database = " + log_database)
+     
      print("  Units = " + units)
      print("  Title = " + title)
 
@@ -435,7 +438,6 @@ class PropagatorHeaterThread(threading.Thread):
                                         else:
                                              propagators[channel]["relay_count"] =\
                                                        propagators[channel]["relay_count"] + 1
-                                        debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"])+ "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                         propagators[channel]["heater_state"] \
                                                              = "Error: Off"
                                         if log_status == "On":
@@ -474,7 +476,6 @@ class PropagatorHeaterThread(threading.Thread):
                                              else:
                                                   propagators[channel]["relay_count"] =\
                                                             propagators[channel]["relay_count"] + 1
-                                             debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                              propagators[channel]["heater_state"] \
                                                                   = "On"
                                              if (log_status == "On"):
@@ -495,7 +496,6 @@ class PropagatorHeaterThread(threading.Thread):
                                              else:
                                                   propagators[channel]["relay_count"] =\
                                                             propagators[channel]["relay_count"] + 1
-                                             debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                                              propagators[channel]["heater_state"] \
                                                                   = "Off"
                                              if (log_status == "On"):
@@ -535,7 +535,6 @@ class PropagatorHeaterThread(threading.Thread):
                               else:
                                    propagators[channel]["relay_count"] =\
                                              propagators[channel]["relay_count"] + 1
-                              debug_log(str(channel) + ": Activations = " + str(propagators[channel]["relay_activation"]) + "; Count = " + str(propagators[channel]["relay_count"]) + "; Consecutive = " + str(propagators[channel]["consecutive_change"]))
                               propagators[channel]["heater_state"] = "Off"
                               if (log_status == "On"):
                                    propagators[channel]["log_off"] = \
@@ -658,7 +657,6 @@ class AirHeaterThread(threading.Thread):
                                    air_relay_count = 0
                               else:
                                    air_relay_count = air_relay_count + 1
-                              debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                               # Turn off relay (fault condition -
                               # avoid overheating)
                               air_heater_state = "Off"
@@ -680,7 +678,6 @@ class AirHeaterThread(threading.Thread):
                                              air_relay_count = 0
                                         else:
                                              air_relay_count = air_relay_count + 1
-                                        debug_log("Air heating: Activations = " + str(air_relay_activation ) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                                         air_heater_state = "On"
                                         if (log_status == "On"):
                                              air_log_on = air_log_on + 1
@@ -697,7 +694,6 @@ class AirHeaterThread(threading.Thread):
                                              air_relay_count = 0
                                         else:
                                              air_relay_count = air_relay_count + 1
-                                        debug_log("Air heating: Activations = " + str(air_relay_activation) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                                         air_heater_state = "Off"
                                         if (log_status == "On"):
                                              air_log_off = air_log_off + 1
@@ -720,7 +716,6 @@ class AirHeaterThread(threading.Thread):
                               air_relay_count = 0
                          else:
                               air_relay_count = air_relay_count + 1
-                         debug_log("Air heating: Activations = " + str(air_relay_activation) + "; Count = " + str(air_relay_count)+ "; Consecutive = " + str(air_consecutive_change ))
                          air_heater_state = "Disabled - Off"
                          heating_air_temp = "Not measured"
                          if (log_status == "On"):
@@ -833,7 +828,6 @@ class LightingThread(threading.Thread):
                                         else:
                                              lighting[channel]["relay_count"] =\
                                                        lighting[channel]["relay_count"] + 1
-                                        debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                         lighting[channel]["light_state"] = "On"
                                         if (log_status == "On"):
                                              lighting[channel]["log_on"] = \
@@ -854,7 +848,6 @@ class LightingThread(threading.Thread):
                                         else:
                                              lighting[channel]["relay_count"] =\
                                                        lighting[channel]["relay_count"] + 1
-                                        debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                         lighting[channel]["light_state"] = "Off"
                                         if (log_status == "On"):
                                              lighting[channel]["log_off"] = \
@@ -876,7 +869,6 @@ class LightingThread(threading.Thread):
                                    else:
                                         lighting[channel]["relay_count"] =\
                                                   lighting[channel]["relay_count"] + 1
-                                   debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                                    if (log_status == "On"):
                                         lighting[channel]["log_off"] = \
                                           lighting[channel]["log_off"]+1
@@ -896,7 +888,6 @@ class LightingThread(threading.Thread):
                               else:
                                    lighting[channel]["relay_count"] =\
                                              lighting[channel]["relay_count"] + 1
-                              debug_log(str(channel) + ": Activations = " + str(lighting[channel]["relay_activation"]) + "; Count = " + str(lighting[channel]["relay_count"])+ "; Consecutive = " + str(lighting[channel]["consecutive_change"]))
                               lighting[channel]["light_state"] = "Disabled - Off"
                               if (log_status == "On"):
                                    lighting[channel]["log_off"] = \
@@ -1164,224 +1155,213 @@ class LogThread(threading.Thread):
           global air_log_on
           global air_log_off
           global air_consecutive_change
-          global config
           
           now = datetime.datetime.now()
 
-          # CSV logging initialisation
-          filetime = now.strftime("%Y-%m-%d-%H-%M")
-          filename=dir+"/logging/"+filetime+"_temperature_log.csv"
-          debug_log("Logging started: " + filename)
-          with open(filename, "at") as csvfile:
-               logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
-               row = ["Date-Time"]
-               row.append("Set Temp")
-               row.append("Controller Temp")
-               for channel in propagators:
-                    row.append(propagators[channel]["name"])
-                    row.append("Heating Active (%)")
-                    row.append("Min Temp")
-                    row.append("Max Temp")
-                    row.append("Error count")
-                    row.append("Relay Activations")
-                    row.append("Consecutive Change")
-               row.append("Light level")
-               for channel in lighting:
-                    row.append(lighting[channel]["name"] + " Light State")
-                    row.append(lighting[channel]["name"] + " Light Active (%)")
-                    row.append(lighting[channel]["name"] + " Relay Activations")
-                    row.append(lighting[channel]["name"] + " Consecutive Change")
-               row.append("Air Temp 2")
-               row.append("Humidity")
-               row.append("Air Heating Temp")
-               row.append("Air Heating Active (%)")
-               row.append("Air heating Relay Activations")
-               row.append("Air heating Consecutive Change")
-               row.append("CPU Temp")
-               logfile.writerow(row)
+          if log_CSV == "Enabled":
+               # CSV logging initialisation
+               filetime = now.strftime("%Y-%m-%d-%H-%M")
+               filename=dir+"/logging/"+filetime+"_temperature_log.csv"
+               debug_log("Logging started: " + filename)
+               with open(filename, "at") as csvfile:
+                    logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
+                    row = ["Date-Time"]
+                    row.append("Set Temp")
+                    row.append("Controller Temp")
+                    for channel in propagators:
+                         row.append(propagators[channel]["name"])
+                         row.append("Heating Active (%)")
+                         row.append("Min Temp")
+                         row.append("Max Temp")
+                         row.append("Error count")
+                         row.append("Relay Activations")
+                         row.append("Consecutive Change")
+                    row.append("Light level")
+                    for channel in lighting:
+                         row.append(lighting[channel]["name"] + " Light State")
+                         row.append(lighting[channel]["name"] + " Light Active (%)")
+                         row.append(lighting[channel]["name"] + " Relay Activations")
+                         row.append(lighting[channel]["name"] + " Consecutive Change")
+                    row.append("Air Temp 2")
+                    row.append("Humidity")
+                    row.append("Air Heating Temp")
+                    row.append("Air Heating Active (%)")
+                    row.append("Air heating Relay Activations")
+                    row.append("Air heating Consecutive Change")
+                    row.append("CPU Temp")
+                    logfile.writerow(row)
 
-          # InfluxDB logging initialisation
-          host = "localhost"
-          port = 8086
-          # Authentication is not enabled. user/password combination is
-          # irrelevant as credentials are ignored and all users have all
-          # privileges. Adding authentication adds complication and requires
-          # secure password storage (otherwise it is irrelevant). 
-          user = "root"
-          password = "root"
-           
-          # The database we created
-          dbname = "greenhouse"
+          if log_database == "Enabled":
+               # InfluxDB logging initialisation
+               host = "localhost"
+               port = 8086
+               # Authentication is not enabled. user/password combination is
+               # irrelevant as credentials are ignored and all users have all
+               # privileges. Adding authentication adds complication and requires
+               # secure password storage (otherwise it is irrelevant). 
+               user = "root"
+               password = "root"
+                
+               # The database we created
+               dbname = "greenhouse"
 
-          # Create the InfluxDB object
-          database = InfluxDBClient(host, port, user, password, dbname)
+               # Create the InfluxDB object
+               database = InfluxDBClient(host, port, user, password, dbname)
 
           WaitForNextLog()
 
           while log_status == "On":
-               # CSV logging
-               debug_log("Write CSV log...")
-               with open(filename, "at") as csvfile:
-                    logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
-                    now = datetime.datetime.now()
-                    row = [now.strftime("%d/%m/%Y %H:%M")]
-                    row.append(propagator_set_temperature)
-                    row.append(controller_temp)
+               debug_log("")
+               debug_log("Updating logs")
+               now = datetime.datetime.now()
+               if log_CSV == "Enabled":
+                    # CSV logging
+                    debug_log("  Write CSV log...")
+                    with open(filename, "at") as csvfile:
+                         logfile = csv.writer(csvfile, delimiter=",", quotechar='"')
+                         row = [now.strftime("%d/%m/%Y %H:%M")]
+                         row.append(propagator_set_temperature)
+                         row.append(controller_temp)
+                         for channel in propagators:
+                              row.append(propagators[channel]["temp"])
+                              row.append(PercentOn(propagators[channel]["log_on"],
+                                                   propagators[channel]["log_off"]))
+                              row.append(propagators[channel]["min_temperature"])
+                              row.append(propagators[channel]["max_temperature"])
+                              row.append(propagators[channel]["log_error_count"])
+                              row.append(propagators[channel]["relay_activation"])
+                              row.append(propagators[channel]["consecutive_change"])
+
+                         row.append(light_level)
+                         for channel in lighting:
+                              row.append(lighting[channel]["light_state"])
+                              row.append(PercentOn(lighting[channel]["log_on"],
+                                                   lighting[channel]["log_off"]))
+                              row.append(lighting[channel]["relay_activation"])
+                              row.append(lighting[channel]["consecutive_change"])
+
+                         row.append(air_temp)
+                         row.append(humidity_level)
+                         row.append(heating_air_temp)
+                         row.append(PercentOn(air_log_on, air_log_off))
+                         row.append(air_relay_activation)
+                         row.append(air_consecutive_change)
+                         row.append(cpu_temp)
+                         
+                         logfile.writerow(row)
+
+               if log_database == "Enabled":
+                    # Database logging
+
+                    debug_log("  Write Database log...")
+                    iso = time.ctime() # temporary resolving database writing
+                    session = "greenhouse"
+                    measurements = {}
+                    errors = ""
+                    if IsFloat(propagator_set_temperature):
+                         measurements.update({"Set Temp": float(propagator_set_temperature)})
+                    else:
+                         errors = AddError("Propagator set temp: "
+                                           + str(propagator_set_temperature), errors)
+                    if IsFloat(controller_temp):
+                         measurements.update({"Controller Internal Temp": controller_temp})
+                    else:
+                         errors = AddError("Controller Temp: " + str(controller_temp),
+                                           errors)
                     for channel in propagators:
-                         row.append(propagators[channel]["temp"])
-                         row.append(PercentOn(propagators[channel]["log_on"],
-                                              propagators[channel]["log_off"]))
-                         row.append(propagators[channel]["min_temperature"])
-                         row.append(propagators[channel]["max_temperature"])
-                         row.append(propagators[channel]["log_error_count"])
-                         row.append(propagators[channel]["relay_activation"])
-                         row.append(propagators[channel]["consecutive_change"])
+                         if propagators[channel]["enabled"] == "Enabled":
+                              if IsFloat(propagators[channel]["temp"]):
+                                   measurements.update({propagators[channel]["name"]
+                                                        + " temp": propagators[channel]["temp"]})
+                              else:
+                                   errors = AddError(propagators[channel]["name"] \
+                                            + " temp: " \
+                                            + str(propagators[channel]["temp"]), errors)
+                              measurements.update({propagators[channel]["name"] + \
+                                                   " Heating Active (%)": \
+                                                        float(PercentOn(
+                                                        propagators[channel]["log_on"],
+                                                        propagators[channel]["log_off"]))})
+                              # Min/Max may have the same error as temperature measurement
+                              # Just skip the min/max if they are not measurements
+                              if IsFloat(propagators[channel]["min_temperature"]):
+                                   measurements.update({propagators[channel]["name"] + \
+                                                   " Min Temp": \
+                                                   propagators[channel]["min_temperature"]})
+                              if IsFloat(propagators[channel]["max_temperature"]):
+                                   measurements.update({propagators[channel]["name"] + \
+                                                   " Max Temp": \
+                                                   propagators[channel]["max_temperature"]})
+                              measurements.update({propagators[channel]["name"] + \
+                                                   " Error count": \
+                                                    propagators[channel]["log_error_count"]})
+                              measurements.update({propagators[channel]["name"] + \
+                                                   " Relay Activations": \
+                                                    propagators[channel]["relay_activation"]})
+                              measurements.update({propagators[channel]["name"] + \
+                                                   " Consecutive Changes": \
+                                                    propagators[channel]["consecutive_change"]})
 
-                    row.append(light_level)
+                    if IsFloat(light_level):
+                         measurements.update({"Light level": light_level})
+                    else:
+                         errors = AddError("Light level: " + str(light_level), errors)
+
                     for channel in lighting:
-                         row.append(lighting[channel]["light_state"])
-                         row.append(PercentOn(lighting[channel]["log_on"],
-                                              lighting[channel]["log_off"]))
-                         row.append(lighting[channel]["relay_activation"])
-                         row.append(lighting[channel]["consecutive_change"])
-
-                    row.append(air_temp)
-                    row.append(humidity_level)
-                    row.append(heating_air_temp)
-                    row.append(PercentOn(air_log_on, air_log_off))
-                    row.append(air_relay_activation)
-                    row.append(air_consecutive_change)
-                    row.append(cpu_temp)
-                    
-                    logfile.writerow(row)
-
-               # Database logging
-
-               debug_log("Write Database log...")
-               iso = time.ctime() # temporary resolving database writing
-               session = "greenhouse"
-               measurements = {}
-               errors = ""
-               if IsFloat(propagator_set_temperature):
-                    measurements.update({"Set Temp": float(propagator_set_temperature)})
-               else:
-                    errors = AddError("Propagator set temp: "
-                                      + str(propagator_set_temperature), errors)
-               if IsFloat(controller_temp):
-                    measurements.update({"Controller Internal Temp": controller_temp})
-               else:
-                    errors = AddError("Controller Temp: " + str(controller_temp),
-                                      errors)
-               for channel in propagators:
-                    if propagators[channel]["enabled"] == "Enabled":
-                         if IsFloat(propagators[channel]["temp"]):
-                              measurements.update({propagators[channel]["name"]
-                                                   + " temp": propagators[channel]["temp"]})
+                         measurements.update({lighting[channel]["name"] + \
+                                   " Light State": lighting[channel]["light_state"]})
+                         measurements.update({lighting[channel]["name"] + \
+                                   " Lighting Active (%)": \
+                                   float(PercentOn(lighting[channel]["log_on"],
+                                   lighting[channel]["log_off"]))})
+                         measurements.update({lighting[channel]["name"] + \
+                                   " Relay Activations": lighting[channel]["relay_activation"]})
+                         measurements.update({lighting[channel]["name"] + \
+                                   " Consecutive Changes": lighting[channel]["consecutive_change"]})
+      
+                    if humidity_enabled == "Enabled":
+                         if IsFloat(air_temp):
+                              measurements.update({"Air Temp 2": air_temp})
                          else:
-                              errors = AddError(propagators[channel]["name"] \
-                                       + " temp: " \
-                                       + str(propagators[channel]["temp"]), errors)
-                         measurements.update({propagators[channel]["name"] + \
-                                              " Heating Active (%)": \
-                                                   float(PercentOn(
-                                                   propagators[channel]["log_on"],
-                                                   propagators[channel]["log_off"]))})
-                         # Min/Max may have the same error as temperature measurement
-                         # Just skip the min/max if they are not measurements
-                         if IsFloat(propagators[channel]["min_temperature"]):
-                              measurements.update({propagators[channel]["name"] + \
-                                              " Min Temp": \
-                                              propagators[channel]["min_temperature"]})
-                         if IsFloat(propagators[channel]["max_temperature"]):
-                              measurements.update({propagators[channel]["name"] + \
-                                              " Max Temp": \
-                                              propagators[channel]["max_temperature"]})
-                         measurements.update({propagators[channel]["name"] + \
-                                              " Error count": \
-                                               propagators[channel]["log_error_count"]})
-                         measurements.update({propagators[channel]["name"] + \
-                                              " Relay Activations": \
-                                               propagators[channel]["relay_activation"]})
-                         measurements.update({propagators[channel]["name"] + \
-                                              " Consecutive Changes": \
-                                               propagators[channel]["consecutive_change"]})
-
-               if IsFloat(light_level):
-                    measurements.update({"Light level": light_level})
-               else:
-                    errors = AddError("Light level: " + str(light_level), errors)
-
-               for channel in lighting:
-                    measurements.update({lighting[channel]["name"] + \
-                              " Light State": lighting[channel]["light_state"]})
-                    measurements.update({lighting[channel]["name"] + \
-                              " Lighting Active (%)": \
-                              float(PercentOn(lighting[channel]["log_on"],
-                              lighting[channel]["log_off"]))})
-                    measurements.update({lighting[channel]["name"] + \
-                              " Relay Activations": lighting[channel]["relay_activation"]})
-                    measurements.update({lighting[channel]["name"] + \
-                              " Consecutive Changes": lighting[channel]["consecutive_change"]})
- 
-               if humidity_enabled == "Enabled":
-                    if IsFloat(air_temp):
-                         measurements.update({"Air Temp 2": air_temp})
-                    else:
-                         errors = AddError("Air Temp 2: " + str(air_temp), errors)
+                              errors = AddError("Air Temp 2: " + str(air_temp), errors)
+                         
+                         if IsFloat(humidity_level):
+                              measurements.update({"Humidity": humidity_level})
+                         else:
+                              errors = AddError("Humidity: " + str(humidity_level), errors)
                     
-                    if IsFloat(humidity_level):
-                         measurements.update({"Humidity": humidity_level})
+                    if IsFloat(heating_air_temp):
+                         measurements.update({"Heating Air Temp": float(heating_air_temp)})
+                    elif air_enabled == "Enabled":
+                         errors = AddError("Heating air temp: " \
+                                           + str(heating_air_temp), errors)
+                    if air_enabled == "Enabled":
+                         measurements.update({"Air Heating Active (%)": \
+                                        float(PercentOn(air_log_on, air_log_off))})
+                    measurements.update({"Air Relay Activations": \
+                                        air_relay_activation})
+                    measurements.update({"Air Relay Consecutive Changes": \
+                                        air_consecutive_change})
+
+                    if IsFloat(cpu_temp):
+                         measurements.update({"CPU Temp": float(cpu_temp)})
                     else:
-                         errors = AddError("Humidity: " + str(humidity_level), errors)
-               
-               if IsFloat(heating_air_temp):
-                    measurements.update({"Heating Air Temp": float(heating_air_temp)})
-               elif air_enabled == "Enabled":
-                    errors = AddError("Heating air temp: " \
-                                      + str(heating_air_temp), errors)
-               if air_enabled == "Enabled":
-                    measurements.update({"Air Heating Active (%)": \
-                                   float(PercentOn(air_log_on, air_log_off))})
-               measurements.update({"Air Relay Activations": \
-                                   air_relay_activation})
-               measurements.update({"Air Relay Consecutive Changes": \
-                                   air_consecutive_change})
+                         errors = AddError("CPU temp: " \
+                                           + str(cpu_temp), errors)
 
-               if IsFloat(cpu_temp):
-                    measurements.update({"CPU Temp": float(cpu_temp)})
-               else:
-                    errors = AddError("CPU temp: " \
-                                      + str(cpu_temp), errors)
+                    measurements.update({"Errors": errors})
 
-               measurements.update({"Errors": errors})
+                    json_body = [
+                    {
+                        "measurement": session,
+                        "time": now.strftime("%Y%m%d%H%M"),
+                        "fields": measurements
+                    }
+                    ]
 
-               json_body = [
-               {
-                   "measurement": session,
-                   "time": now.strftime("%Y%m%d%H%M"),
-                   "fields": measurements
-               }
-               ]
+                    # Write JSON to InfluxDB
+                    database.write_points(json_body)
 
-               # Write JSON to InfluxDB
-               database.write_points(json_body)
-
-               # Update config
-
-               channel = 1
-               for child in propagator_sensors:
-                    child.find("ACTIVATIONS").text = str(propagators[channel]["relay_activation"])
-                    channel = channel + 1
-
-               for child in air_sensors:
-                    child.find("ACTIVATIONS").text = str(air_relay_activation)
-
-               channel = 1
-               for child in lighting_sensors:
-                    child.find("ACTIVATIONS").text = str(lighting[channel]["relay_activation"])
-                    channel = channel + 1
-
-               config.write(config_file)
                
                # Reset measurements
 
@@ -1405,6 +1385,40 @@ class LogThread(threading.Thread):
                debug_log("Wait for the next log interval")
                WaitForNextLog()
           log_status = "Off"
+
+class ControlThread(threading.Thread):
+
+     def run(self):
+          global config
+
+          try:
+               while 1: # Run the control forever while powered
+
+                    time.sleep(log_interval) # Use logging interval as the repeat rate
+
+                    # Update config
+
+                    debug_log("")
+                    debug_log("Updating config file with latest values")
+
+                    channel = 1
+                    for child in propagator_sensors:
+                         child.find("ACTIVATIONS").text = str(propagators[channel]["relay_activation"])
+                         channel = channel + 1
+
+                    for child in air_sensors:
+                         child.find("ACTIVATIONS").text = str(air_relay_activation)
+
+                    channel = 1
+                    for child in lighting_sensors:
+                         child.find("ACTIVATIONS").text = str(lighting[channel]["relay_activation"])
+                         channel = channel + 1
+
+                    config.write(config_file)
+
+          except KeyboardInterrupt:
+               exit()
+
 
 # Initialisation
 
@@ -1577,6 +1591,7 @@ air_temp = 0
 heating_air_temp = 0
 air_heater_state = "Undefined"
 air_relay_activation = air_heating_relay_activations
+print("* Air heating relay activations = " + str(air_relay_activation))
 air_relay_count = 0 # Count since last relay change
 air_consecutive_change = 0 # No. of consecutive relay changes
 
@@ -1616,6 +1631,9 @@ for child in light_schedule:
 # Read logging
 logging = root.find("LOGGING")
 log_interval = int(logging.find("INTERVAL").text)*60
+log_CSV = logging.find("CSV").text
+log_database = logging.find("DATABASE").text
+
 # Interval in minutes from config file
 
 if (logging.find("ENABLED").text == "Enabled"):
@@ -1666,6 +1684,7 @@ PropagatorHeaterThread().start()
 AirHeaterThread().start()
 HumidityThread().start()
 MonitorThread().start()
+ControlThread().start()
 if fake_lighting == "Enabled":
      FakeLightingThread().start()
 else:

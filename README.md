@@ -55,6 +55,11 @@ See wiki.
 
 ## Changelog
 
+### V3.0.0-0.5.0
+Add e-mail config to display of config.
+
+Added configuration option for XML and/or database logging.
+
 ### V3.0.0-0.4.0
 Restricted relay activations if there has been a recent activation.
 
