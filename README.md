@@ -40,6 +40,27 @@ Installation:
     - python3 -m pip install influxdb
     - influx -precision rfc3339
     - create database greenhouse
+- Install Grafana and assume that Raspbian Stretch OS is installed. My instructions are based on [How to install Grafana+InfluxDB on the Raspberry Pi](https://www.circuits.dk/install-grafana-influxdb-raspberry/)
+    - sudo apt-get install apt-transport-https curl
+	- curl https://bintray.com/user/downloadSubjectPublicKey?username=bintray | sudo apt-key add -
+	- echo "deb https://dl.bintray.com/fg2it/deb stretch main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+	- sudo apt-get update
+	- sudo apt-get install grafana
+	- sudo /bin/systemctl daemon-reload
+	- sudo systemctl enable grafana-server
+	- sudo service grafana-server start
+	- sudo systemctl start grafana-server
+	- http://ip.address:3000/ – where ip.addresss is the IP address of your Raspberry Pi. Default is user admin, password admin 
+	- Setup the data source:
+		- Name = greenhouse
+		- Type = Influxdb
+		- URL = http://ip.address:3000/ – where ip.addresss is the IP address of your Raspberry Pi.
+		- Access = Server
+		- Database = greenhouse
+		- user = root
+		- password = root
+		- Min time interval = 10m (the write interval of data)
+		- Create dashboards. As a start import those in the Grafana dashboards folder.
 - Edit config.xml to define your system hardware. The defaults match my hardware.
     
 Recommendations (to make life easier):
