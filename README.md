@@ -11,6 +11,9 @@ Requires:
 - The [GPIO Library](https://code.google.com/p/raspberry-gpio-python/) (Already on most Raspberry Pi OS builds).
 - The [Flask web server](https://www.raspberrypi.org/learning/python-web-server-with-flask/worksheet/). Install command:
   - sudo apt-get install python3-flask
+- The [Astral](https://pypi.org/project/astral/1.10.1/) sun position calculator:
+  - pip3 install astral
+  - Note: the version of Python on my Raspberry Pi precluded using the latest Astral so version 1.10.1 is required.
 - A [Raspberry Pi](http://www.raspberrypi.org/) with Raspbian Stretch OS installed (require python3.5 to support Influxdb).
 - Database setup in [Influxdb](https://docs.influxdata.com/influxdb/v1.7/). The intention behind logging measurements to a database is to allow graphical monitoring of the greenhouse history. My plan is to use Grafana - see [How to install Grafana+InfluxDB on the Raspberry Pi](https://www.circuits.dk/install-grafana-influxdb-raspberry/) for more information, although at this stage full documentation is not presented here for using Grafana with the Greenhouse Controller.
 - Hardware with [MAX31855 temperature monitors](https://www.maximintegrated.com/en/products/analog/sensors-and-sensor-interface/MAX31855.html).
@@ -54,6 +57,9 @@ Recommendations (to make life easier):
 See wiki.
 
 ## Changelog
+
+### V3.0.0-0.6.0
+Add control of lighting to extend spring. Sunrise is simulated an offset number of days in the future. 
 
 ### V3.0.0-0.5.0
 Add e-mail config to display of config.

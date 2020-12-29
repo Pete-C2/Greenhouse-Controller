@@ -17,6 +17,8 @@ import threading
 import time
 import xml.etree.ElementTree as ET
 
+import astral # V1.10.1
+
 
 from flask import Flask, render_template, request
 from influxdb import InfluxDBClient
@@ -47,6 +49,13 @@ def debug_log(log_string):
 
 def print_config():
      print("Configuration:")
+
+     print("  Installation location:")
+     print("    City = " + city)
+     print("    Country = " + country)
+     print("    Time Zone = " + zone)
+     print("    Lat/Long = " + str(lat) + "/" + str(lon) + ", Elevation = " + str(elev))
+
      print("  Temperature thermocouples:")
      for cs_pin, relay_pin, cal, meas, name, status in zip(
                                     propagator_cs_pins,
@@ -83,6 +92,9 @@ def print_config():
            + "%RH at " + str(humidity_humidity_calibrate) + "%RH")
 
      print("  Lighting:")
+     print("    Mode = " + lighting_mode)
+     if (lighting_mode == "SimulateSunrise"):
+          print("    Days offset = " + str(lighting_sunrise_offset))
      for relay_pin, on_lux, hysteresis, name, status in zip(
                                                         lighting_relay_pins,
                                                         lighting_on_lux,
@@ -599,8 +611,10 @@ class AirHeaterThread(threading.Thread):
 
           GPIO.setmode(GPIO.BOARD)
           GPIO.setup(air_heating_relay_pin, GPIO.OUT)
-          GPIO.output(air_heating_relay_pin, GPIO.LOW)
+          GPIO.setup(unused_relay_pins[1], GPIO.OUT) # Temp until relay replaced
           
+          GPIO.output(air_heating_relay_pin, GPIO.LOW)
+          GPIO.output(unused_relay_pins[1], GPIO.LOW) # Temp until relay replaced
           try:
                while 1: # Control the air heating forever while powered
                     debug_log("")
@@ -648,6 +662,8 @@ class AirHeaterThread(threading.Thread):
                                              
                          if air_temperature == "Error":
                               GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                              GPIO.output(unused_relay_pins[1], GPIO.LOW) # Temp until relay replaced
+                              
                               if air_heater_state == "On":
                                    air_relay_activation  = \
                                              air_relay_activation + 1
@@ -668,6 +684,7 @@ class AirHeaterThread(threading.Thread):
                                    if air_temperature < air_set_temperature:
                                         # Turn air heater relay on
                                         GPIO.output(air_heating_relay_pin, GPIO.HIGH)
+                                        GPIO.output(unused_relay_pins[1], GPIO.HIGH) # Temp until relay replaced
                                         # Turn on relay
                                         if air_heater_state != "On":
                                              air_relay_activation  = \
@@ -684,6 +701,7 @@ class AirHeaterThread(threading.Thread):
                                         debug_log("Air heating relay on")
                                    else:
                                         GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                                        GPIO.output(unused_relay_pins[1], GPIO.LOW) # Temp until relay replaced
                                         # Turn off relay
                                         if air_heater_state == "On":
                                              air_relay_activation  = \
@@ -706,6 +724,7 @@ class AirHeaterThread(threading.Thread):
                     else:
                          # Air heating disabled
                          GPIO.output(air_heating_relay_pin, GPIO.LOW)
+                         GPIO.output(unused_relay_pins[1], GPIO.LOW) # Temp until relay replaced
                          # Turn off relay
                          if air_heater_state == "On":
                               air_relay_activation  = \
@@ -739,6 +758,29 @@ def lighting_turn_on():
           propagators[channel]["lighting_turn_on"] = True
           channel = channel + 1
 
+# Calculate today's simulated sunrise
+
+def lighting_sunrise():
+     
+     today = datetime.date.today()
+     future = today + datetime.timedelta(days=lighting_sunrise_offset)
+     # Lighting simulates an earlier spring, i.e. some days in the future
+
+     sunToday = location.sun(local=True, date=today)
+     debug_log('Sunrise: %s' % str(sunToday['sunrise']))
+     debug_log('Sunset: %s' % str(sunToday['sunset']))
+     debug_log('Day Length: %s' % str(sunToday['sunset']-sunToday["sunrise"]))
+
+     sunFuture = location.sun(local=True, date=future)
+
+     desiredLength = sunFuture["sunset"]-sunFuture["sunrise"]
+     todayLength = sunToday["sunset"]-sunToday["sunrise"]
+     simulatedSunrise = sunToday["sunset"] - desiredLength
+
+     debug_log('Simulated sunrise: %s' % str(simulatedSunrise))
+     debug_log('Simulated day Length: %s' % str(sunToday['sunset']-simulatedSunrise))
+     return (simulatedSunrise.time())
+
 class LightingThread(threading.Thread):
 
      def run(self):
@@ -758,6 +800,10 @@ class LightingThread(threading.Thread):
           error_count = 0
           sensor_alert = False
 
+          if (lighting_mode == "SimulateSunrise"):
+              lighting_schedule[2]["time"] = lighting_sunrise() # Get initial sunrise simulation
+              sunrise_calculated = datetime.date.today()
+          
           try:
                while 1: # Control the lighting forever while powered
                     debug_log("")
@@ -790,6 +836,11 @@ class LightingThread(threading.Thread):
                               sensor_alert = True
 
                     now = datetime.datetime.now().time()
+                    if (lighting_mode == "SimulateSunrise"):
+                         if (datetime.date.today() > sunrise_calculated):
+                              debug_log("Recalculate sunrise")
+                              lighting_schedule[2]["time"] = lighting_sunrise() # Get initial sunrise simulation
+                              sunrise_calculated = datetime.date.today()
 
                     set_status = lighting_schedule[1]["status"]
                     # Default to the first timed status
@@ -1469,7 +1520,9 @@ logging = root.find("LOGGING")
 temps_schedule = root.find("TEMPERATURES")
 air_temps_schedule = root.find("AIR-TEMPERATURES")
 light_schedule = root.find("LIGHTING")
+light_mode = root.find("LIGHTING-MODE")
 test = root.find("TEST") # Used for unused hardware that needs testing
+location = root.find("LOCATION")
 
 # Read hardware configuration
 # Clock
@@ -1531,6 +1584,9 @@ for child in lighting_sensors:
      lighting_temperature_offset = child.find("TEMPERATURE-OFFSET").text
      # Does the temperature need an offset when the lighting is on?
 any_lighting = False # Set to true when the lighting is on => apply temperature offset
+lighting_mode = light_mode.find("MODE").text
+if (lighting_mode == "SimulateSunrise"):
+     lighting_sunrise_offset = int(light_mode.find("OFFSET").text) # Days in the future
 
 # Read display settings configuration
 units = display.find("UNITS").text.lower()
@@ -1543,6 +1599,23 @@ if test is not None:
      for child in test:
           unused_relay_pins.append(int(child.find("RELAY").text))
           unused_channel_names.append(child.find("NAME").text)
+
+# Read installation location
+city = location.find("CITY").text
+country = location.find("COUNTRY").text
+zone = location.find("ZONE").text
+lat = float(location.find("LAT").text)
+lon = float(location.find("LON").text)
+elev = float(location.find("ELEV").text)
+
+astral_init = astral.Astral()
+location = astral_init['London'] # Populate a default location
+location.name = city # Update with the installation location
+location.latitude = lat
+location.longitude = lon
+location.timezone = zone
+location.region = country
+location.elevation = elev
 
 # Create dictionaries and variables to store measurements
 propagators = {}
